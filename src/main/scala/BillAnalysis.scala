@@ -45,18 +45,21 @@ object BillAnalysis {
     val spark = new SparkContext(conf)
     val sqlContext = new SQLContext(spark)
 
+    //println(sys.env("PWD"))
     //register UDFs
     sqlContext.udf.register("df_preprocess",preprocess _)
     val df_preprocess_udf = udf(preprocess _)
     sqlContext.udf.register("df_extractSimilarities",extractSimilarities)
     val df_extractSimilarities_udf = udf(extractSimilarities)
 
-    var bills = sqlContext.read.json("file:///home/alexeys/PoliticalScienceTests/FreshStart_Tests/bills.json")
+
+    var ipath_str = sys.env("PWD")
+    ipath_str = "file://".concat(ipath_str).concat("/data/bills.json")
+    var bills = sqlContext.read.json(ipath_str)
     //bills.printSchema()
    
     //apply necessary UDFs
     bills = bills.withColumn("hashed_content", df_preprocess_udf(col("content"))).drop("content")
-    //bills = bills.withColumn('hashed_content', df_extractHashedSets_udf(col("good_content"))).drop("good_content")
     bills.registerTempTable("bills_df")
 
     val cartesian = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2, a.hashed_content as hc1, b.hashed_content as hc2 FROM bills_df a, bills_df b WHERE a.primary_key != b.primary_key AND a.year <= b.year AND a.state != b.state")
@@ -66,13 +69,16 @@ object BillAnalysis {
     val matches = cartesian.withColumn("similarities", df_extractSimilarities_udf(col("hc1"),col("hc2"))).select("similarities")
     //matches.printSchema() 
 
+    //for deugging
     //for (word <- matches.collect()) {
     //  println(word)
     //}
-    //println(matches.count())
+    //printlnv(matches.count())
 
-    matches.write.parquet("/user/alexeys/test_output2")
-    //matches.write.save("/user/alexeys/test_output2")
+    //matches.write.parquet("/user/alexeys/test_output")
+    var opath_str = sys.env("PWD").mkString
+    opath_str = "file://".concat(opath_str).concat("/test_output")
+    matches.write.parquet(opath_str)
 
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
