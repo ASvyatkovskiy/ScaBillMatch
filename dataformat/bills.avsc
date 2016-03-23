@@ -1,0 +1,11 @@
+{"namespace": "bills.avro",
+ "type": "record",
+ "name": "Bill",
+ "fields": [
+     {"name": "year", "type": "int"},
+     {"name": "state",  "type": "string"},
+     {"name": "docid", "type": "string"},
+     {"name": "docversion", "type": "string"},
+     {"name": "content", "type": "string"}
+ ]
+}
