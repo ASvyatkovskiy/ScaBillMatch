@@ -21,7 +21,7 @@ import simplejson
 
 output_dicts = list() # = {'year':None, 'state':'', 'docid':'', 'docversion':'', 'content':''}
 
-with open("./partition_test",mode="r") as finput:
+with open("../data/partition_99",mode="r") as finput:
     lines = finput.readlines()
     for line in lines:
         sid, content = line.split("^^^")
@@ -37,5 +37,5 @@ with open("./partition_test",mode="r") as finput:
         output_dicts.append(output_dict)
 
 
-with open('bills.json', 'w') as fp:
+with open('../data/bills.json', 'w') as fp:
     simplejson.dump(output_dicts, fp)
