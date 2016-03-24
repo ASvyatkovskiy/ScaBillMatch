@@ -59,7 +59,8 @@ object BillAnalysis {
     bills.printSchema()
   
     //Repartition: key1 to solving current memory issues: (java heap OutOfMemory)
-    var bills_rept = bills.repartition(col("content")).cache()
+    var bills_rept = bills.repartition(col("content"))
+    bills_rept.cache()
     bills_rept.explain
 
     //apply necessary UDFs
@@ -67,14 +68,15 @@ object BillAnalysis {
     bills_rept.registerTempTable("bills_df")
 
     //JOIN on !=
-    val cartesian = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2, a.hashed_content as hc1, b.hashed_content as hc2 FROM bills_df a JOIN bills_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state")
+    val cartesian = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2, a.hashed_content as hc1, b.hashed_content as hc2 FROM bills_df a LEFT JOIN bills_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state")
+    println(cartesian.count())
     cartesian.printSchema()
     //val matches = cartesian.withColumn("similarities", df_extractSimilarities_udf(col("hc1"),col("hc2"))).select("similarities","pk1","pk2")
     val matches = cartesian.withColumn("similarities", df_extractSimilarities_udf(col("hc1"),col("hc2"))).select("similarities")
     //matches.printSchema() 
 
     //for deugging
-    //for (word <- matches.collect()) {
+    //for (word <- cartesian.collect()) {
     //  println(word)
     //}
 
