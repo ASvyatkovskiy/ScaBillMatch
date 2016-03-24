@@ -56,15 +56,19 @@ object BillAnalysis {
     var ipath_str = sys.env("PWD")
     ipath_str = "file://".concat(ipath_str).concat("/data/bills.json")
     var bills = sqlContext.read.json(ipath_str)
-    //bills.printSchema()
-   
-    //apply necessary UDFs
-    bills = bills.withColumn("hashed_content", df_preprocess_udf(col("content"))).drop("content")
-    bills.registerTempTable("bills_df")
+    bills.printSchema()
+  
+    //Repartition: key1 to solving current memory issues: (java heap OutOfMemory)
+    var bills_rept = bills.repartition(col("content")).cache()
+    bills_rept.explain
 
-    val cartesian = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2, a.hashed_content as hc1, b.hashed_content as hc2 FROM bills_df a, bills_df b WHERE a.primary_key != b.primary_key AND a.year <= b.year AND a.state != b.state")
-    //cartesian.printSchema()
-    println(cartesian.count())
+    //apply necessary UDFs
+    bills_rept = bills_rept.withColumn("hashed_content", df_preprocess_udf(col("content"))).drop("content")
+    bills_rept.registerTempTable("bills_df")
+
+    //JOIN on !=
+    val cartesian = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2, a.hashed_content as hc1, b.hashed_content as hc2 FROM bills_df a JOIN bills_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state")
+    cartesian.printSchema()
     //val matches = cartesian.withColumn("similarities", df_extractSimilarities_udf(col("hc1"),col("hc2"))).select("similarities","pk1","pk2")
     val matches = cartesian.withColumn("similarities", df_extractSimilarities_udf(col("hc1"),col("hc2"))).select("similarities")
     //matches.printSchema() 
@@ -73,10 +77,9 @@ object BillAnalysis {
     //for (word <- matches.collect()) {
     //  println(word)
     //}
-    //printlnv(matches.count())
 
     //matches.write.parquet("/user/alexeys/test_output")
-    var opath_str = sys.env("PWD").mkString
+    var opath_str = sys.env("PWD")
     opath_str = "file://".concat(opath_str).concat("/test_output")
     matches.write.parquet(opath_str)
 
