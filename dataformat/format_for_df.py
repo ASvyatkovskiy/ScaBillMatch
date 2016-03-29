@@ -19,23 +19,46 @@ import simplejson
 }
 '''
 
-output_dicts = list() # = {'year':None, 'state':'', 'docid':'', 'docversion':'', 'content':''}
+output_dicts_meta = list() # = {'year':None, 'state':'', 'docid':'', 'docversion':'', 'content':''}
+output_dicts = list()
 
-with open("../data/partition_99",mode="r") as finput:
-    lines = finput.readlines()
-    for line in lines:
-        sid, content = line.split("^^^")
-        blah, bla, state, year, docid, docversion_pre = sid.split("/")
-        output_dict = {'year':None, 'state':'', 'docid':'', 'docversion':'', 'content':None}
-        output_dict['year'] = int(year)
-        output_dict['state'] = state
-        output_dict['docid'] = docid
-        version = docversion_pre.split("_")[1].rstrip(".txt")
-        output_dict['docversion'] = version
-        output_dict['content'] = content.decode("utf-8",errors='replace')
-        output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
-        output_dicts.append(output_dict)
+import glob
+#inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_1state/CO/*/*")
+inputs = glob.glob("../data/partition*")
+
+#metadata
+for input in inputs:
+    with open(input,mode="r") as finput:
+        lines = finput.readlines()
+        for line in lines:
+            sid, content = line.split("^^^")
+            #bla, state, year, docid, docversion_pre = sid.split("/")
+            blah, bla, state, year, docid, docversion_pre = sid.split("/")
+            output_dict = {'year':None, 'state':'', 'docid':'', 'docversion':'', 'primary_key':None}
+            output_dict['year'] = int(year)
+            output_dict['state'] = state
+            output_dict['docid'] = docid
+            version = docversion_pre.split("_")[1].rstrip(".txt")
+            output_dict['docversion'] = version
+            output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
+            output_dicts_meta.append(output_dict)
+
+for input in inputs:
+    with open(input,mode="r") as finput:
+        lines = finput.readlines()
+        for line in lines:
+            sid, content = line.split("^^^")
+            #bla, state, year, docid, docversion_pre = sid.split("/")
+            blah, bla, state, year, docid, docversion_pre = sid.split("/")
+            output_dict = {'primary_key':'', 'content':None}
+            version = docversion_pre.split("_")[1].rstrip(".txt")
+            output_dict['content'] = content.decode("utf-8",errors='replace')
+            output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
+            output_dicts.append(output_dict)
 
 
-with open('../data/bills.json', 'w') as fp:
+with open('/scratch/network/alexeys/bills/lexs/text_1state/bills_metadata.json', 'w') as fp:
+    simplejson.dump(output_dicts_meta, fp)
+
+with open('/scratch/network/alexeys/bills/lexs/text_1state/bills.json', 'w') as fp:
     simplejson.dump(output_dicts, fp)
