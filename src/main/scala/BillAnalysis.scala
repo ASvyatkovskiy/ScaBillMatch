@@ -32,11 +32,22 @@ object BillAnalysis {
     wGrps.distinct
   }
 
-
   def extractSimilarities = (s_wGrps: WrappedArray[Long], m_wGrps: WrappedArray[Long]) => {
     val model_size = (m_wGrps.length+s_wGrps.length)/2.
     val matchCnt = m_wGrps.intersect(s_wGrps).length
     matchCnt/model_size * 100.
+  }
+
+  //get type of var utility 
+  def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
+
+  //converter utility. I need it to convert Spark Dataframe types after collect()
+  def convert (data: Array[scala.collection.Seq[Any]]) : Map[String,Any] = {
+       var output_map:  Map[String,Any] = Map()
+       for (elem <- data) {
+           output_map += (elem(0).toString -> elem(1))
+       }
+       output_map
   }
 
   def main(args: Array[String]) {
@@ -56,7 +67,7 @@ object BillAnalysis {
 
     //var ipath_str = sys.env("PWD")
     //ipath_str = "file://".concat(ipath_str).concat("/data/bills_metadata.json")
-    var ipath_meta_str = "file:///scratch/network/alexeys/bills/lexs/text_1state/bills_metadata.json"
+    var ipath_meta_str = "file:///scratch/network/alexeys/bills/lexs/text_3states_partitioned/bills_metadata.json"
     var bills_meta = sqlContext.read.json(ipath_meta_str)
     bills_meta.printSchema()
   
@@ -68,17 +79,10 @@ object BillAnalysis {
     println(bills_meta.count())
 
     //JOIN on !=
-    //val cartesian = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2, a.hashed_content as hc1, b.hashed_content as hc2 FROM bills_df a LEFT JOIN bills_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state AND a.docversion LIKE 'Enacted%' AND b.docversion LIKE 'Enacted%'")
     val cartesian_meta = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2 FROM bills_meta_df a LEFT JOIN bills_meta_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state") // AND a.docversion LIKE 'Enacted%' AND b.docversion LIKE 'Enacted%'")
     cartesian_meta.cache()
     val cnt = cartesian_meta.count()
     cartesian_meta.printSchema()
-    println(cnt)
-    //for deugging
-    //for (word <- cartesian_meta.take(2)) {
-    //  println(word)
-    //  println(word(1)) 
-    //}
 
     if (cnt != 0) {
 
@@ -89,7 +93,7 @@ object BillAnalysis {
         //println(flat_cartesian.distinct.count())
         //flat_cartesian.registerTempTable("flat_cartesian_df")
 
-        var ipath_str = "file:///scratch/network/alexeys/bills/lexs/text_1state/bills.json"
+        var ipath_str = "file:///scratch/network/alexeys/bills/lexs/text_3states_partitioned/bills.json"
         var bills = sqlContext.read.json(ipath_str)
         bills.printSchema()
   
@@ -107,39 +111,35 @@ object BillAnalysis {
 
         //apply UDF
         bills = bills.withColumn("hashed_content", df_preprocess_udf(col("content"))).drop("content")
-        //bills.cache() 
        
-        //FIXME approach
+        var local_bills = bills.rdd.map(row => row.toSeq).collect()
+        //println(manOf(local_bills))
+        val bills_map = convert(local_bills)
 
-        //l.map(x => x -> (f _).tupled(x)).toMap
+        val useful_pairs = cartesian_meta.rdd.map(row => row.toSeq).collect()
+        //println(manOf(useful_pairs))
 
-        val hashed_bills = bills.rdd.map(x => x(0),List())collect()
-        for (pp <- hashed_bills) {
-           
-           matches.append(extractSimilarities())
-        }
-        val useful_pairs = cartesian_meta.collect()
-        ///var matches = List[Float]
-        println(useful_pairs)
-
-        //for (pp <- useful_pairs) {
-            //val el1 = hashed_bills_dict(pp(1))
-            //val el2 = hashed_bills_dict(pp(2))
-            //matches.append(extractSimilarities())
+        var matches: ListBuffer[Double] = ListBuffer()
+        //for (word <- local_bills) {
+        //    println(manOf(word(0)))
+        //    println(manOf(word(1)))
         //}
 
-        //val matches = cartesian.withColumn("similarities", df_extractSimilarities_udf(col("hc1"),col("hc2"))).select("similarities")
+        for (pp <- useful_pairs) {
+            val el1 = bills_map(pp(0).toString).asInstanceOf[WrappedArray[Long]]
+            val el2 = bills_map(pp(1).toString).asInstanceOf[WrappedArray[Long]]
+            matches += extractSimilarities(el1,el2)
+        }
+        
+        for (m <- matches) {
+            println(m) 
+        } 
+
         //matches.write.parquet("/user/alexeys/test_output")
         //var opath_str = sys.env("PWD")
         //opath_str = "file://".concat(opath_str).concat("/test_output")
         //matches.printSchema() 
-        println("Hi")
     }
-
-    //matches.write.parquet("/user/alexeys/test_output")
-    //var opath_str = sys.env("PWD")
-    //opath_str = "file://".concat(opath_str).concat("/test_output")
-    //matches.write.parquet(opath_str)
 
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
