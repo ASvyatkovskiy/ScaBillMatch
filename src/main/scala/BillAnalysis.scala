@@ -11,6 +11,7 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
+import org.apache.spark.storage.StorageLevel
 
 object BillAnalysis {
 
@@ -53,8 +54,9 @@ object BillAnalysis {
   def main(args: Array[String]) {
     val t0 = System.nanoTime()
     val conf = new SparkConf().setAppName("TextProcessing")
-      .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-      .set("spark.kryoserializer.buffer.mb","24") 
+      .set("spark.driver.maxResultSize", "10g")
+      //.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+      //.set("spark.kryoserializer.buffer.mb","24") 
     val spark = new SparkContext(conf)
     val sqlContext = new SQLContext(spark)
 
@@ -65,8 +67,8 @@ object BillAnalysis {
     sqlContext.udf.register("df_extractSimilarities",extractSimilarities)
     val df_extractSimilarities_udf = udf(extractSimilarities)
 
-    //var ipath_str = sys.env("PWD")
-    //ipath_str = "file://".concat(ipath_str).concat("/data/bills_metadata.json")
+    //var ipath_meta_str = sys.env("PWD")
+    //ipath_meta_str = "file://".concat(ipath_meta_str).concat("/data/bills_metadata.json")
     var ipath_meta_str = "file:///scratch/network/alexeys/bills/lexs/text_3states_partitioned/bills_metadata.json"
     var bills_meta = sqlContext.read.json(ipath_meta_str)
     bills_meta.printSchema()
@@ -79,13 +81,16 @@ object BillAnalysis {
     println(bills_meta.count())
 
     //JOIN on !=
-    val cartesian_meta = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2 FROM bills_meta_df a LEFT JOIN bills_meta_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state") // AND a.docversion LIKE 'Enacted%' AND b.docversion LIKE 'Enacted%'")
-    cartesian_meta.cache()
+    val cartesian_meta = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2 FROM bills_meta_df a LEFT JOIN bills_meta_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state AND a.docversion LIKE 'Enacted%' AND b.docversion LIKE 'Enacted%'")
+    //cartesian_meta.cache()
+    cartesian_meta.persist(StorageLevel.MEMORY_AND_DISK)
     val cnt = cartesian_meta.count()
     cartesian_meta.printSchema()
+    println(cnt)
 
     if (cnt != 0) {
 
+        println("0X") 
         cartesian_meta.registerTempTable("cartesian_df")
         //val flat_cartesian = sqlContext.sql("SELECT pk1 FROM cartesian_df UNION SELECT pk2 FROM cartesian_df")
         //flat_cartesian.printSchema()
@@ -112,6 +117,8 @@ object BillAnalysis {
         //apply UDF
         bills = bills.withColumn("hashed_content", df_preprocess_udf(col("content"))).drop("content")
        
+
+        println("1X")
         var local_bills = bills.rdd.map(row => row.toSeq).collect()
         //println(manOf(local_bills))
         val bills_map = convert(local_bills)
@@ -119,12 +126,15 @@ object BillAnalysis {
         val useful_pairs = cartesian_meta.rdd.map(row => row.toSeq).collect()
         //println(manOf(useful_pairs))
 
+
+        println("2X")
         var matches: ListBuffer[Double] = ListBuffer()
         //for (word <- local_bills) {
         //    println(manOf(word(0)))
         //    println(manOf(word(1)))
         //}
 
+        println("3X")
         for (pp <- useful_pairs) {
             val el1 = bills_map(pp(0).toString).asInstanceOf[WrappedArray[Long]]
             val el2 = bills_map(pp(1).toString).asInstanceOf[WrappedArray[Long]]
