@@ -83,7 +83,7 @@ object BillAnalysis {
     //JOIN on !=
     val cartesian_meta = sqlContext.sql("SELECT a.primary_key as pk1, b.primary_key as pk2 FROM bills_meta_df a LEFT JOIN bills_meta_df b ON a.primary_key != b.primary_key WHERE a.year < b.year AND a.state != b.state AND a.docversion LIKE 'Enacted%' AND b.docversion LIKE 'Enacted%'")
     //cartesian_meta.cache()
-    cartesian_meta.persist(StorageLevel.MEMORY_AND_DISK)
+    //cartesian_meta.persist(StorageLevel.MEMORY_AND_DISK)
     val cnt = cartesian_meta.count()
     cartesian_meta.printSchema()
     println(cnt)
