@@ -72,17 +72,17 @@ us_state_abbrev = {
 }
 
 import glob
-#inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/*")
-inputs = glob.glob("../data/partition*")
+inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/*")
+#inputs = glob.glob("../data/partition*")
 
-#foutput_meta = open("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/bills_metadata.json","wa")
-foutput_meta = open("bills_metadata.json","wa")
+foutput_meta = open("/scratch/network/alexeys/bills/lexs/bills_metadata.json","wa")
+#foutput_meta = open("bills_metadata.json","wa")
 
 #metadata
+output_dicts_meta = list()
 for input in inputs:
     with open(input,mode="r") as finput:
         lines = finput.readlines()
-        output_dicts_meta = list()
         for line in lines:
             sid, content = line.split("^^^")
             try: 
@@ -100,22 +100,22 @@ for input in inputs:
             output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
             output_dicts_meta.append(output_dict)
 
-        for i, output_dict in enumerate(output_dicts_meta):
-            output_dict['primary_key'] = i
-            simplejson.dump(output_dict, foutput_meta)
-            foutput_meta.write('\n')
+for i, output_dict in enumerate(output_dicts_meta):
+    output_dict['primary_key'] = i
+    simplejson.dump(output_dict, foutput_meta)
+    foutput_meta.write('\n')
 
 #print len(distinct_keys)
 #print len(distinct_keys2)
 #print distinct_keys2
 
-#foutput = open("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/bills.json","wa")
-foutput = open("bills.json","wa")
+foutput = open("/scratch/network/alexeys/bills/lexs/bills.json","wa")
+#foutput = open("bills.json","wa")
 
+output_dicts = list()
 for input in inputs:
     with open(input,mode="r") as finput:
         lines = finput.readlines()
-        output_dicts = list()
         for line in lines:
             sid, content = line.split("^^^")
             try:
@@ -129,7 +129,7 @@ for input in inputs:
             output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
             output_dicts.append(output_dict)
 
-        for i, output_dict in enumerate(output_dicts):
-            output_dict['primary_key'] = i
-            simplejson.dump(output_dict, foutput)
-            foutput.write('\n')
+for i, output_dict in enumerate(output_dicts):
+    output_dict['primary_key'] = i
+    simplejson.dump(output_dict, foutput)
+    foutput.write('\n')
