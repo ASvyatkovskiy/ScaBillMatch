@@ -52,28 +52,38 @@ object BillAnalysisFromCartesianRDD {
       //.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       //.set("spark.kryoserializer.buffer.mb","24") 
     val spark = new SparkContext(conf)
+    spark.addJar("file:///home/alexeys/PoliticalScienceTests/ScaBillMatch/target/scala-2.10/BillAnalysis-assembly-1.0.jar")
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
 
-    val bills = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills_small.json").as[Document]
+    val bills = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills.json").as[Document]
 
     //First, run the hashing step here
     val hashed_bills = bills.rdd.map(bill => (bill.primary_key,bill.content)).mapValues(content => preprocess(content))
 
-    val cartesian_pairs = sqlContext.read.json("file:///home/alexeys/PoliticalScienceTests/ScaBillMatch/dataformat/good_pairs_small.json").as[CartesianPair].rdd.map(pp => (pp.pk1,pp.pk2))
-
+    //val cartesian_pairs = sqlContext.read.json("file:///home/alexeys/PoliticalScienceTests/ScaBillMatch/dataformat/good_pairs.json").as[CartesianPair].rdd.map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.objectFile[CartesianPair]("/user/alexeys/test_object").map(pp => (pp.pk1,pp.pk2))
+    //for (word <- cartesian_pairs.take(5)) {
+    //    println("X "+word)
+    //    println(manOf(word))
+    //}
+    
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
         .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
-        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2), (v1, v2))}).distinct.mapValues(pp => extractSimilarities(pp))
-        //.map({case(_, (((k1,k2), v1), v2))=> ((k1,k2),extractSimilarities(v1, v2))})
+        .map({case(_, (((k1,k2), v1), v2))=>(v1, v2)}).map(pp => extractSimilarities(pp))
+    //.map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues(pp => extractSimilarities(pp))
+    //    //.map({case(_, (((k1,k2), v1), v2))=> ((k1,k2),extractSimilarities(v1, v2))})
 
-    for (m <- matches) {
-        println(m) 
-    } 
+    //for (m <- matches.collect()) {
+    //    println(m) 
+    //} 
+    println(matches.count())
+    //println(matches.distinct.count())
 
+    matches.saveAsTextFile("/user/alexeys/test_output")
     //matches.write.parquet("/user/alexeys/test_output")
     //var opath_str = sys.env("PWD")
     //opath_str = "file://".concat(opath_str).concat("/test_output")
