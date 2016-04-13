@@ -19,3 +19,5 @@ libraryDependencies ++= Seq(
   ("org.apache.spark"  % "spark-sql_2.10"               % "1.6.0" % "provided"),
   ("org.apache.lucene" % "lucene-analyzers-common"      % "5.1.0")
 )
+
+libraryDependencies += "com.databricks" %% "spark-avro" % "2.0.1"
