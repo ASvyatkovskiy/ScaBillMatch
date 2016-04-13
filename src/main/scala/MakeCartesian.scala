@@ -4,15 +4,11 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions._
 
 import scala.collection.mutable.ListBuffer
-//import scala.collection.immutable.Map
-//import org.apache.spark.mllib.linalg.Vector
 
-import org.apache.lucene.analysis.en.EnglishAnalyzer
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
-import org.apache.spark.storage.StorageLevel
+import com.databricks.spark.avro._
 
 object MakeCartesian {
 
@@ -56,7 +52,7 @@ object MakeCartesian {
     import sqlContext.implicits._
 
     val vv: String = "Enacted"
-    var bills_meta = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills_metadata.json").as[MetaDocument].filter(x => x.docversion contains vv)
+    var bills_meta = sqlContext.read.avro("file:///scratch/network/alexeys/bills/lexs/bills_metadata.avro").as[MetaDocument].filter(x => x.docversion contains vv)
 
     var bills_meta_bcast = spark.broadcast(bills_meta.collect())
 

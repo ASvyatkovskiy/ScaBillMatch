@@ -11,7 +11,7 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
-import org.apache.spark.storage.StorageLevel
+import com.databricks.spark.avro._
 
 object BillAnalysisFromCartesianRDD {
 
@@ -56,12 +56,11 @@ object BillAnalysisFromCartesianRDD {
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
 
-    val bills = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills.json").as[Document]
+    val bills = sqlContext.read.avro("file:///scratch/network/alexeys/bills/lexs/bills.avro").as[Document]
 
     //First, run the hashing step here
     val hashed_bills = bills.rdd.map(bill => (bill.primary_key,bill.content)).mapValues(content => preprocess(content))
 
-    //val cartesian_pairs = sqlContext.read.json("file:///home/alexeys/PoliticalScienceTests/ScaBillMatch/dataformat/good_pairs.json").as[CartesianPair].rdd.map(pp => (pp.pk1,pp.pk2))
     val cartesian_pairs = spark.objectFile[CartesianPair]("/user/alexeys/test_object").map(pp => (pp.pk1,pp.pk2))
     //for (word <- cartesian_pairs.take(5)) {
     //    println("X "+word)
