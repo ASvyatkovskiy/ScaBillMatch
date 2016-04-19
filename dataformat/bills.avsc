@@ -1,11 +1,8 @@
 {"namespace": "bills.avro",
  "type": "record",
- "name": "Bill",
+ "name": "Metadata",
  "fields": [
-     {"name": "year", "type": "int"},
-     {"name": "state",  "type": "string"},
-     {"name": "docid", "type": "string"},
-     {"name": "docversion", "type": "string"},
+     {"name": "primary_key", "type": "int"},
      {"name": "content", "type": "string"}
  ]
 }
