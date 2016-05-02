@@ -1,6 +1,6 @@
 language: scala
 
 env:
-  - TEST_DIR=scala;  TEST_SCRIPT="sbt assembly"
+  - TEST_DIR=.;  TEST_SCRIPT="sbt assembly"
 
-script: cd $TEST_DIR  &&  $TEST_SCRIPT  &&  cd ..
+script: cd $TEST_DIR  &&  $TEST_SCRIPT
