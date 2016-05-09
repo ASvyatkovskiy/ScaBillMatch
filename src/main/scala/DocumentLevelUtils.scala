@@ -33,7 +33,7 @@ object DocumentLevelUtils {
   def extractSimilarities = (grps: Tuple2[ArrayBuffer[Long], ArrayBuffer[Long]]) => {
     val s_wGrps = grps._1
     val m_wGrps = grps._2
-    val model_size = (m_wGrps.length+s_wGrps.length)/2.
+    val model_size = m_wGrps.union(s_wGrps).length
     val matchCnt = m_wGrps.intersect(s_wGrps).length
     matchCnt/model_size * 100.
   }
