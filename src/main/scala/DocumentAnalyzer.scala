@@ -86,7 +86,8 @@ object DocumentAnalyzer {
     matches.saveAsObjectFile("/user/alexeys/test_main_output")
 
     //scala.Tuple2[Long, Long]
-    matches.filter(kv => (kv._2 > params.secThreshold)).keys.saveAsObjectFile("/user/alexeys/test_new_filtered_pairs")
+    val threshold = params.secThreshold
+    matches.filter(kv => (kv._2 > threshold)).keys.saveAsObjectFile("/user/alexeys/test_new_filtered_pairs")
 
     spark.stop()
   }
