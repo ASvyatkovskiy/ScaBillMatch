@@ -35,6 +35,7 @@ object DocumentAnalyzer {
           |For example, the following command runs this app on a dataset:
           |
           | spark-submit  --class DocumentAnalyzer \
+          | --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
           | --secThreshold 70.0 /scratch/network/alexeys/bills/lexs/bills_3.json
         """.stripMargin)

@@ -67,6 +67,7 @@ object MakeCartesian {
           |For example, the following command runs this app on a dataset:
           |
           | spark-submit  --class MakeCartesian \
+          | --master yarn-client --num-executors 30 --executor-memory 10g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
           | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json
         """.stripMargin)
