@@ -60,14 +60,14 @@ object MakeCartesian {
         .action((x, c) => c.copy(nPartitions = x))
       arg[String]("<inputFile>")
         .required()
-        .text(s"input file, one JSON per line, located in NFS by default (file://)")
+        .text(s"input file, one JSON per line")
         .action((x, c) => c.copy(inputFile = x))
       note(
         """
           |For example, the following command runs this app on a dataset:
           |
           | spark-submit  --class MakeCartesian \
-          | --master yarn-client --num-executors 30 --executor-memory 10g \
+          | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
           | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json
         """.stripMargin)
@@ -95,7 +95,7 @@ object MakeCartesian {
     import sqlContext.implicits._
 
     val vv: String = params.docVersion //"Enacted"
-    var bills_meta = sqlContext.read.json("file://"+params.inputFile).as[MetaDocument].filter(x => x.docversion contains vv).cache()
+    var bills_meta = sqlContext.read.json(params.inputFile).as[MetaDocument].filter(x => x.docversion contains vv).cache()
 
     var bills_meta_bcast = spark.broadcast(bills_meta.collect())
 
@@ -105,7 +105,7 @@ object MakeCartesian {
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
-    cartesian_pairs.saveAsObjectFile("/user/alexeys/test_object0")
+    cartesian_pairs.saveAsObjectFile("/user/alexeys/test_object")
 
     spark.stop()
    }
