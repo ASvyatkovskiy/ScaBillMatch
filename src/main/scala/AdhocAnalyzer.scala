@@ -13,15 +13,9 @@ import org.apache.spark.ml.feature.StopWordsRemover
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
-//import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
-
-//import breeze.linalg.{DenseVector=>BDV, SparseVector=>BSV, Vector=>BV}
-
-//import com.invincea.spark.hash.{LSH, LSHModel}
-//import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 
 object AdhocAnalyzer {
 
@@ -56,7 +50,7 @@ object AdhocAnalyzer {
     val spark = new SparkContext(conf)
     val sqlContext = new SQLContext(spark)
 
-    val bills = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills_10.json")
+    val bills = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills_20.json")
     bills.repartition(col("primary_key"))
     bills.explain
     //bills.printSchema()
@@ -77,7 +71,7 @@ object AdhocAnalyzer {
     //ngram_df = ngram.transform(tokenized_df)
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(10)
+    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(100)
     val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
     //featurized_df.show(5,false)
 
@@ -92,22 +86,11 @@ object AdhocAnalyzer {
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
     //val hashed_bills = featurized_df.select("rawFeatures").rdd.map(row => converted1(row.toSeq))
-
     //println(hashed_bills.collect())
-    /*
-      Experimental
-    */
-    //val lsh = new  LSH(data = hashed_bills, p = 65537, m = 1000, numRows = 1000, numBands = 25, minClusterSize = -1)
-    //val model = lsh.run
-    //model.scores.collect().foreach(println)
-    //println(model.clusters.count())  
-
-    //println(manOf(model))
-    //println(manOf(model.scores.collect()))
 
     //Experimental
     //First, run the hashing step here
-    val cartesian_pairs = spark.objectFile[CartesianPair]("/user/alexeys/test_object0/").map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.objectFile[CartesianPair]("/user/alexeys/test_object_20/").map(pp => (pp.pk1,pp.pk2))
 
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
@@ -117,7 +100,7 @@ object AdhocAnalyzer {
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => CosineDistance.compute(v1.toSparse,v2.toSparse)})
     //matches.collect().foreach(println)
-    matches.saveAsObjectFile("/user/alexeys/test_main_output0")
+    matches.saveAsObjectFile("/user/alexeys/test_main_output")
 
     //scala.Tuple2[Long, Long]
     //matches.filter(kv => (kv._2 > 70.0)).keys.saveAsObjectFile("/user/alexeys/test_new_filtered_pairs0")
