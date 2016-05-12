@@ -11,7 +11,7 @@ import scala.collection.mutable.WrappedArray
 
 object MakeCartesian {
 
-  case class Params(inputFile: String = null, docVersion: String = null, nPartitions: Int = 0)
+  case class Params(inputFile: String = null, outputFile: String = null, docVersion: String = null, nPartitions: Int = 0)
     extends AbstractParams[Params]
 
   def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]]) : (MetaDocument, Array[CartesianPair]) = {
@@ -62,6 +62,10 @@ object MakeCartesian {
         .required()
         .text(s"input file, one JSON per line")
         .action((x, c) => c.copy(inputFile = x))
+      arg[String]("<outputFile>")
+        .required()
+        .text(s"output file")
+        .action((x, c) => c.copy(outputFile = x))
       note(
         """
           |For example, the following command runs this app on a dataset:
@@ -69,7 +73,7 @@ object MakeCartesian {
           | spark-submit  --class MakeCartesian \
           | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
-          | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json
+          | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json /user/alexeys/valid_pairs
         """.stripMargin)
     }
 
@@ -105,7 +109,7 @@ object MakeCartesian {
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
-    cartesian_pairs.saveAsObjectFile("/user/alexeys/test_object")
+    cartesian_pairs.saveAsObjectFile(params.outputFile)
 
     spark.stop()
    }
