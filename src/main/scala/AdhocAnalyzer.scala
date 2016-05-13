@@ -1,3 +1,5 @@
+import scopt.OptionParser
+
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SQLContext
@@ -19,6 +21,9 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 
 object AdhocAnalyzer {
 
+  case class Params(inputBillsFile: String = null, inputPairsFile: String = null, outputFile: String = null, distanceMeasure: String = null, nPartitions: Int = 0, numTextFeatures: Int = 10)
+    extends AbstractParams[Params]
+
   /*
     Experimental
   */
@@ -29,20 +34,66 @@ object AdhocAnalyzer {
     Tuple2(first,second.toSparse)
   }
 
-  /*
-    Experimental
-  */
-  def converted1(row: scala.collection.Seq[Any]) : SparseVector = {
-    val ret = row.asInstanceOf[WrappedArray[Vector]]
-    ret(0).toSparse
-  }
-
   //get type of var utility 
   def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
 
   def main(args: Array[String]) {
 
     val t0 = System.nanoTime()
+
+    val defaultParams = Params()
+
+    val parser = new OptionParser[Params]("AdhocAnalyzer") {
+      head("AdhocAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs")
+      opt[Int]("nPartitions")
+        .required()
+        .text(s"Number of partitions in bills_meta RDD")
+        .action((x, c) => c.copy(nPartitions = x))
+      opt[Int]("numTextFeatures")
+        .required()
+        .text(s"Number of text features to keep in hashingTF")
+        .action((x, c) => c.copy(numTextFeatures = x))
+      opt[String]("distanceMeasure")
+        .required()
+        .text(s"Distance measure used")
+        .action((x, c) => c.copy(distanceMeasure = x))
+      arg[String]("<inputBillsFile>")
+        .required()
+        .text(s"Bill input file, one JSON per line")
+        .action((x, c) => c.copy(inputBillsFile = x))
+      arg[String]("<inputPairsFile>")
+        .required()
+        .text(s"CartesianPairs object input file")
+        .action((x, c) => c.copy(inputPairsFile = x))
+      arg[String]("<outputFile>")
+        .required()
+        .text(s"output file")
+        .action((x, c) => c.copy(outputFile = x))
+      note(
+        """
+          |For example, the following command runs this app on a dataset:
+          |
+          | spark-submit  --class AdhocAnalyzer \
+          | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
+          | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
+          | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json /user/alexeys/valid_pairs
+        """.stripMargin)
+    }
+
+    parser.parse(args, defaultParams).map { params =>
+      run(params)
+    } getOrElse {
+      System.exit(1)
+    }
+
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
+
+  }
+
+
+  def run(params: Params) {
+
     val conf = new SparkConf().setAppName("AdhocAnalyzer")
       .set("spark.dynamicAllocation.enabled","true")
       .set("spark.shuffle.service.enabled","true")
@@ -50,7 +101,7 @@ object AdhocAnalyzer {
     val spark = new SparkContext(conf)
     val sqlContext = new SQLContext(spark)
 
-    val bills = sqlContext.read.json("file:///scratch/network/alexeys/bills/lexs/bills_20.json")
+    val bills = sqlContext.read.json(params.inputBillsFile)
     bills.repartition(col("primary_key"))
     bills.explain
     //bills.printSchema()
@@ -71,26 +122,22 @@ object AdhocAnalyzer {
     //ngram_df = ngram.transform(tokenized_df)
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(100)
+    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.numTextFeatures)
     val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
-    //featurized_df.show(5,false)
+    //featurized_df.show(15,false)
 
-    //FIXME idf weighting. That gave me identical zeros??
-    /*
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("pre_features")
-    val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
-    var idfModel = idf.fit(train)
-    val rescaled_df = idfModel.transform(cv).drop("rawFeatures")
-    rescaled_df.show(5,false)
-    */
+    //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
+    var idfModel = idf.fit(featurized_df)
+    val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
+    rescaled_df.show(15,false)
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
-    //val hashed_bills = featurized_df.select("rawFeatures").rdd.map(row => converted1(row.toSeq))
     //println(hashed_bills.collect())
 
     //Experimental
     //First, run the hashing step here
-    val cartesian_pairs = spark.objectFile[CartesianPair]("/user/alexeys/test_object_20/").map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.objectFile[CartesianPair](params.inputPairsFile).map(pp => (pp.pk1,pp.pk2))
 
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
@@ -100,14 +147,11 @@ object AdhocAnalyzer {
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => CosineDistance.compute(v1.toSparse,v2.toSparse)})
     //matches.collect().foreach(println)
-    matches.saveAsObjectFile("/user/alexeys/test_main_output")
+    matches.saveAsObjectFile(params.outputFile)
 
     //scala.Tuple2[Long, Long]
     //matches.filter(kv => (kv._2 > 70.0)).keys.saveAsObjectFile("/user/alexeys/test_new_filtered_pairs0")
-
-    val t1 = System.nanoTime()
-    println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
-
+ 
     spark.stop()
    }
 }
