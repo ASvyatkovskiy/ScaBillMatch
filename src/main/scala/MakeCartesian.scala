@@ -58,11 +58,11 @@ object MakeCartesian {
         .required()
         .text(s"Number of partitions in bills_meta RDD")
         .action((x, c) => c.copy(nPartitions = x))
-      arg[String]("<inputFile>")
+      opt[String]("inputFile")
         .required()
         .text(s"input file, one JSON per line")
         .action((x, c) => c.copy(inputFile = x))
-      arg[String]("<outputFile>")
+      opt[String]("outputFile")
         .required()
         .text(s"output file")
         .action((x, c) => c.copy(outputFile = x))
@@ -73,7 +73,7 @@ object MakeCartesian {
           | spark-submit  --class MakeCartesian \
           | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
-          | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json /user/alexeys/valid_pairs
+          | --docVersion Enacted --nPartitions 30 --inputFile /scratch/network/alexeys/bills/lexs/bills_metadata_3.json --outputFile /user/alexeys/valid_pairs
         """.stripMargin)
     }
 
