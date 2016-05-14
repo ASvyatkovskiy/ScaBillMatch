@@ -21,7 +21,7 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 
 object AdhocAnalyzer {
 
-  case class Params(inputBillsFile: String = null, inputPairsFile: String = null, outputFile: String = null, measureName: String = null, nPartitions: Int = 0, numTextFeatures: Int = 10)
+  case class Params(inputBillsFile: String = null, inputPairsFile: String = null, outputMainFile: String = null, outputFilteredFile: String = null, measureName: String = null, nPartitions: Int = 0, numTextFeatures: Int = 10)
     extends AbstractParams[Params]
 
   /*
@@ -57,18 +57,22 @@ object AdhocAnalyzer {
         .required()
         .text(s"Distance measure used")
         .action((x, c) => c.copy(measureName = x))
-      arg[String]("<inputBillsFile>")
+      opt[String]("inputBillsFile")
         .required()
         .text(s"Bill input file, one JSON per line")
         .action((x, c) => c.copy(inputBillsFile = x))
-      arg[String]("<inputPairsFile>")
+      opt[String]("inputPairsFile")
         .required()
         .text(s"CartesianPairs object input file")
         .action((x, c) => c.copy(inputPairsFile = x))
-      arg[String]("<outputFile>")
+      opt[String]("outputMainFile")
         .required()
-        .text(s"output file")
-        .action((x, c) => c.copy(outputFile = x))
+        .text(s"outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]")
+        .action((x, c) => c.copy(outputMainFile = x))
+      opt[String]("outputFilteredFile")
+        .required()
+        .text(s"outputFilteredFile: CartesianPairs passing similarity threshold")
+        .action((x, c) => c.copy(outputFilteredFile = x))
       note(
         """
           |For example, the following command runs this app on a dataset:
@@ -76,7 +80,7 @@ object AdhocAnalyzer {
           | spark-submit  --class AdhocAnalyzer \
           | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
-          | --docVersion Enacted --nPartitions 30 /scratch/network/alexeys/bills/lexs/bills_metadata_3.json /user/alexeys/valid_pairs
+          | --docVersion Enacted --nPartitions 30 --inputBillsFile /scratch/network/alexeys/bills/lexs/bills_3.json --inputPairsFile /user/alexeys/valid_pairs --outputMainFile /user/alexeys/test_main_output --outputFilteredFile /user/alexeys/test_filtered_output
         """.stripMargin)
     }
 
@@ -129,28 +133,39 @@ object AdhocAnalyzer {
     //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
     var idfModel = idf.fit(featurized_df)
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
-    //rescaled_df.show(15,false)
+    rescaled_df.show(5) //,false)
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
     //println(hashed_bills.collect())
 
     //Experimental
     //First, run the hashing step here
+    println(params.inputPairsFile)
     val cartesian_pairs = spark.objectFile[CartesianPair](params.inputPairsFile).map(pp => (pp.pk1,pp.pk2))
 
-    var distanceMeasure: DistanceMeasure = CosineDistance
+    var distanceMeasure: DistanceMeasure = null
+    var threshold: Double = 0.0
+
     params.measureName match {
+      case "cosine" => {
+        distanceMeasure = CosineDistance
+        threshold = ???
+      }
       case "hamming" => {
         distanceMeasure = HammingDistance
+        threshold = ???
       }
       case "euclidean" => {
         distanceMeasure = EuclideanDistance
+        threshold = ???
       }
       case "manhattan" => {
         distanceMeasure = ManhattanDistance
+        threshold = ???
       }
       case "jaccard" => {
         distanceMeasure = JaccardDistance
+        threshold = ???
       }
       case other: Any =>
         throw new IllegalArgumentException(
@@ -161,15 +176,16 @@ object AdhocAnalyzer {
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
         .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
-
+    //println(firstjoin.count())
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
     //matches.collect().foreach(println)
-    matches.saveAsObjectFile(params.outputFile)
+    matches.saveAsObjectFile(params.outputMainFile)
 
     //scala.Tuple2[Long, Long]
-    //matches.filter(kv => (kv._2 > 70.0)).keys.saveAsObjectFile("/user/alexeys/test_new_filtered_pairs0")
+    //Experimental
+    matches.filter(kv => (kv._2 > threshold)).keys.saveAsObjectFile(params.outputFilteredFile)
  
     spark.stop()
    }
