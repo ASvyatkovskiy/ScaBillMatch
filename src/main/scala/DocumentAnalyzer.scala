@@ -5,6 +5,11 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions._
 
+import org.dianahep.histogrammar._
+import org.dianahep.histogrammar.histogram._
+
+import java.io._
+
 
 object DocumentAnalyzer {
 
@@ -49,7 +54,7 @@ object DocumentAnalyzer {
           | spark-submit  --class DocumentAnalyzer \
           | --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
-          | --secThreshold 70.0 --inputBillsFile /scratch/network/alexeys/bills/lexs/bills_3.json \
+          | --secThreshold 70.0 --inputBillsFile file:///scratch/network/alexeys/bills/lexs/bills_3.json \
           | --inputPairsFile /user/alexeys/test_object --outputMainFile /user/alexeys/test_main_output \
           | --outputFilteredFile /user/alexeys/test_new_filtered_pairs
         """.stripMargin)
@@ -96,8 +101,21 @@ object DocumentAnalyzer {
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues(pp => DocumentLevelUtils.extractSimilarities(pp)) //.cache()
-
+    
+    //matches.collect().foreach(println)
     matches.saveAsObjectFile(params.outputMainFile)
+
+    //book histograms here
+    val sim_histogram = Histogram(200, 0, 100, {matches: Tuple2[Tuple2[Long,Long],Double] => matches._2})
+    val all_histograms = Label("Similarity" -> sim_histogram)
+
+    val final_histogram = matches.aggregate(all_histograms)(new Increment, new Combine)
+    //save output 
+    val json_string = final_histogram("Similarity").toJson.stringify
+    val file = new File("/user/alexeys/test_histos")
+    val bw = new BufferedWriter(new FileWriter(file))
+    bw.write(json_string)
+    bw.close()
 
     //scala.Tuple2[Long, Long]
     val threshold = params.secThreshold
