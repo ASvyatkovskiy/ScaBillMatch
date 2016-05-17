@@ -73,7 +73,7 @@ object MakeCartesian {
           | spark-submit  --class MakeCartesian \
           | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
           | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
-          | --docVersion Enacted --nPartitions 30 --inputFile /scratch/network/alexeys/bills/lexs/bills_metadata_3.json --outputFile /user/alexeys/valid_pairs
+          | --docVersion Enacted --nPartitions 30 --inputFile file:///scratch/network/alexeys/bills/lexs/bills_metadata_3.json --outputFile /user/alexeys/valid_pairs
         """.stripMargin)
     }
 
@@ -115,4 +115,4 @@ object MakeCartesian {
    }
 }
 
-@serializable case class MetaDocument(primary_key: Long, state: Long, docversion: String, year: Long)
+@serializable case class MetaDocument(primary_key: Long, state: Long, docid: String, docversion: String, year: Long)
