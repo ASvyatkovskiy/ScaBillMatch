@@ -1,5 +1,3 @@
-//package com.github.karlhigley.spark.neighbors.linalg
-
 import breeze.linalg.norm
 import org.apache.spark.mllib.linalg.{ SparseVector, Vectors }
 

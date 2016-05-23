@@ -19,7 +19,6 @@ mydata: org.apache.spark.rdd.RDD[CartesianPair] = MapPartitionsRDD[3] at objectF
 scala> mydata.take(5)
 res1: Array[CartesianPair] = Array()
 */
-
 import com.typesafe.config._
 
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
@@ -121,3 +120,5 @@ object MakeCartesian {
 }
 
 @serializable case class MetaDocument(primary_key: Long, state: Long, docid: String, docversion: String, year: Long)
+@serializable case class Document(primary_key: Long, content: String)
+@serializable case class CartesianPair(pk1: Long, pk2: Long)

@@ -3,9 +3,7 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions._
 
-//import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
-//import scala.collection.mutable.WrappedArray
 
 object SectionLevelUtils {
 
