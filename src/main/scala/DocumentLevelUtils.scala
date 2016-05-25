@@ -34,7 +34,7 @@ object DocumentLevelUtils {
     val s_wGrps = grps._1
     val m_wGrps = grps._2
     val matchCnt = m_wGrps.intersect(s_wGrps).length.toDouble
-    matchCnt/(m_wGrps.length + s_wGrps.length - matchCnt)
+    matchCnt/(m_wGrps.length + s_wGrps.length - matchCnt)*100.
   }
 
   //get type of var utility 
