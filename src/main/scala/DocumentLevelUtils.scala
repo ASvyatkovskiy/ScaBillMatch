@@ -33,7 +33,8 @@ object DocumentLevelUtils {
   def extractSimilarities (grps: Tuple2[ArrayBuffer[Long], ArrayBuffer[Long]]) : Double = {
     val s_wGrps = grps._1
     val m_wGrps = grps._2
-    (m_wGrps.intersect(s_wGrps).length.toDouble)/(m_wGrps.length + s_wGrps.length)
+    val matchCnt = m_wGrps.intersect(s_wGrps).length.toDouble
+    matchCnt/(m_wGrps.length + s_wGrps.length - matchCnt)
   }
 
   //get type of var utility 
