@@ -86,7 +86,7 @@ private final object JaccardDistance extends DistanceMeasure {
     val indices1 = v1.indices.toSet
     val indices2 = v2.indices.toSet
     val intersection = indices1.intersect(indices2).size.toDouble
-    val union = indices1.size+indices1.size-intersection
+    val union = indices1.size+indices2.size-intersection
     intersection/union*100
   }
 }
