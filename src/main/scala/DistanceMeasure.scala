@@ -85,8 +85,8 @@ private final object JaccardDistance extends DistanceMeasure {
   def compute(v1: SparseVector, v2: SparseVector): Double = {
     val indices1 = v1.indices.toSet
     val indices2 = v2.indices.toSet
-    val intersection = indices1.intersect(indices2)
-    val union = indices1.union(indices2)
-    1.0 - intersection.size / union.size
+    val intersection = indices1.intersect(indices2).size.toDouble
+    val union = indices1.size+indices1.size-intersection
+    intersection/union*100
   }
 }
