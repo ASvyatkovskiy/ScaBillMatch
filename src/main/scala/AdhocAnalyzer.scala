@@ -8,17 +8,6 @@ Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     inputPairsFile: CartesianPairs object input file
     outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
     outputFilteredFile: CartesianPairs passing similarity threshold
-
-      note(
-        """
-          |For example, the following command runs this app on a dataset:
-          |
-          | spark-submit  --class AdhocAnalyzer \
-          | --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g \
-          | target/scala-2.10/BillAnalysis-assembly-1.0.jar \
-          | --docVersion Enacted --nPartitions 30 --numTextFeatures 10 --measureName cosine --inputBillsFile file:///scratch/network/alexeys/bills/lexs/bills_3.json --inputPairsFile /user/alexeys/valid_pairs --outputMainFile /user/alexeys/test_main_output --outputFilteredFile /user/alexeys/test_filtered_output
-        """.stripMargin)
-    }
 */
 
 import com.typesafe.config._
@@ -47,6 +36,8 @@ import org.dianahep.histogrammar.histogram._
 
 import java.io._
 
+import org.graphframes._
+
 object AdhocAnalyzer {
 
   /*
@@ -64,6 +55,8 @@ object AdhocAnalyzer {
 
   def main(args: Array[String]) {
 
+     println(s"\nExample submit command: spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+
     val t0 = System.nanoTime()
 
     val params = ConfigFactory.load("adhocAnalyzer")
@@ -80,7 +73,8 @@ object AdhocAnalyzer {
       .set("spark.shuffle.service.enabled","true")
 
     val spark = new SparkContext(conf)
-    val sqlContext = new SQLContext(spark)
+    val sqlContext = new org.apache.spark.sql.SQLContext(spark)
+    import sqlContext.implicits._
 
     val bills = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
     bills.repartition(col("primary_key"))
@@ -160,23 +154,34 @@ object AdhocAnalyzer {
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
     //matches.collect().foreach(println)
     matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
+    //matches.filter(kv => (kv._2 > threshold)).saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
+
+    val edges_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("src","dst","similarity")
+    edges_df.printSchema
+    edges_df.show()
+
+    val vertices_df = rescaled_df.select(col("primary_key").alias("id"), col("content"))
+    vertices_df.printSchema
+    vertices_df.show()
+    val gr = GraphFrame(vertices_df,edges_df)
+
+    //gr.vertices.filter("age > 35")
+    //gr.edges.filter("similarity > 20")
+    //gr.inDegrees.filter("inDegree >= 2")
+    val results = gr.pageRank.resetProbability(0.01).run()
+    results.vertices.select("primary_key", "pagerank").show()
+
 
     //add histogramming Experimental
     val sim_histogram = Histogram(200, 0, 100, {matches: Tuple2[Tuple2[Long,Long],Double] => matches._2})
     val all_histograms = Label("Similarity" -> sim_histogram)
-
     val final_histogram = matches.aggregate(all_histograms)(new Increment, new Combine)
-    //save output 
     val json_string = final_histogram("Similarity").toJson.stringify
     val file = new File("/user/alexeys/test_histos")
     val bw = new BufferedWriter(new FileWriter(file))
     bw.write(json_string)
     bw.close()    
 
-    //scala.Tuple2[Long, Long]
-    //Experimental
-    matches.filter(kv => (kv._2 > threshold)).keys.saveAsObjectFile(params.getString("adhocAnalyzer.outputFilteredFile"))
- 
     spark.stop()
    }
 }
