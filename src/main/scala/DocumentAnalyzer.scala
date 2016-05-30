@@ -18,12 +18,6 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions._
 
-import org.dianahep.histogrammar._
-import org.dianahep.histogrammar.histogram._
-
-import java.io._
-
-
 object DocumentAnalyzer {
 
   //get type of var utility 
@@ -73,18 +67,6 @@ object DocumentAnalyzer {
     
     //matches.collect().foreach(println)
     matches.saveAsObjectFile(params.getString("documentAnalyzer.outputMainFile"))
-
-    //book histograms here
-    val sim_histogram = Histogram(200, 0, 100, {matches: Tuple2[Tuple2[Long,Long],Double] => matches._2})
-    val all_histograms = Label("Similarity" -> sim_histogram)
-
-    val final_histogram = matches.aggregate(all_histograms)(new Increment, new Combine)
-    //save output 
-    val json_string = final_histogram("Similarity").toJson.stringify
-    val file = new File("/user/alexeys/test_histos")
-    val bw = new BufferedWriter(new FileWriter(file))
-    bw.write(json_string)
-    bw.close()
 
     //scala.Tuple2[Long, Long]
     val threshold = params.getDouble("documentAnalyzer.secThreshold")
