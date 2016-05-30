@@ -5,11 +5,6 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions._
 
-import org.dianahep.histogrammar._
-import org.dianahep.histogrammar.histogram._
-
-import java.io._
-
 object SectionAnalyzer {
 
   //get type of var utility 
