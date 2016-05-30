@@ -1,0 +1,6 @@
+language: scala
+
+env:
+  - TEST_DIR=.;  TEST_SCRIPT="sbt assembly"
+
+script: cd $TEST_DIR  &&  $TEST_SCRIPT
