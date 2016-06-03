@@ -6,14 +6,14 @@ Scala based reboot of diffusion study (bill match)
 
 `MakeCartesian`, will produce all the pairs of primary keys of the documents satisfying a predicate.
 Following parameters need to be filled in the `resources/makeCartesian.conf` file:
-	* docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted...
-	* nPartitions: number of partitions in bills_meta RDD
-	* use_strict: boolean, yes or no to consider strict parameters
-	* strict_state: specify state (a long integer from 1 to 50) for one-against-all user selection (strict)
-	* strict_docid: specify document ID for one-against-all user selection (strict)
-	* strict_year: specify year for one-against-all user selection (strict)
-	* inputFile: input file, one JSON per line
-	* outputFile: output file
+* docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted...
+* nPartitions: number of partitions in bills_meta RDD
+* use_strict: boolean, yes or no to consider strict parameters
+* strict_state: specify state (a long integer from 1 to 50) for one-against-all user selection (strict)
+* strict_docid: specify document ID for one-against-all user selection (strict)
+* strict_year: specify year for one-against-all user selection (strict)
+* inputFile: input file, one JSON per line
+* outputFile: output file
 
 Example to explore output in spark-shell:
 ```bash
@@ -29,24 +29,24 @@ res1: Array[CartesianPair] = Array()
 With `DocumentAnalyzer`, one can calculate all-pairs similarity considering possible combinations of eligible pairs obtained on the previous step.
 
 Following parameters need to be filled in the `resources/documentAnalyzer.conf` file:
-	secThreshold: Minimum Jaccard similarity to inspect on section level 
-        * inputBillsFile: Bill input file, one JSON per line
-        * inputPairsFile: CartesianPairs object input file
-        * outputMainFile: outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
-        * outputFilteredFile: CartesianPairs passing similarity threshold
+* secThreshold: Minimum Jaccard similarity to inspect on section level 
+* inputBillsFile: Bill input file, one JSON per line
+* inputPairsFile: CartesianPairs object input file
+* outputMainFile: outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
+* outputFilteredFile: CartesianPairs passing similarity threshold
 
 ## Calculate document similarity (workflow 2)
 
 Calculate document/section similarity using bag-of-words and TF-IDF. Spark ML library and Dataframes are used.
 
 Following parameters need to be filled in the `resources/adhocAnalyzer.conf` file:
-    * nPartitions: Number of partitions in bills_meta RDD
-    * numTextFeatures: Number of text features to keep in hashingTF
-    * measureName: Distance measure used
-    * inputBillsFile: Bill input file, one JSON per line
-    * inputPairsFile: CartesianPairs object input file
-    * outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
-    * outputFilteredFile: CartesianPairs passing similarity threshold
+* nPartitions: Number of partitions in bills_meta RDD
+* numTextFeatures: Number of text features to keep in hashingTF
+* measureName: Distance measure used
+* inputBillsFile: Bill input file, one JSON per line
+* inputPairsFile: CartesianPairs object input file
+* outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
+* outputFilteredFile: CartesianPairs passing similarity threshold
     
 ## Prepare a histogram of similarities
 
