@@ -63,7 +63,7 @@ object MakeCartesian {
          } 
        } else {
          //simple condition
-          if (istate != jstate && iyear < jyear) {
+          if (pk1 < pk2 && iyear <= jyear) {
              var output: CartesianPair = CartesianPair(pk1,pk2)
              output_arr += output
           }
