@@ -17,7 +17,7 @@ object DocumentLevelUtils {
     val distinct_tokens = Stemmer.tokenize(line).distinct //.mkString
 
     var wGrps = ArrayBuffer.empty[Long]
-    val grpSize = 5
+    val grpSize = 1
     for (n <- 0 to distinct_tokens.length-grpSize) {
       val cgrouplst = distinct_tokens.drop(n).take(grpSize)
       var cgrp = ""

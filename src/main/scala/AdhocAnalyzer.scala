@@ -6,7 +6,7 @@ Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     measureName: Distance measure used
     inputBillsFile: Bill input file, one JSON per line
     inputPairsFile: CartesianPairs object input file
-    outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
+    outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
     outputFilteredFile: CartesianPairs passing similarity threshold
 */
 
@@ -37,9 +37,9 @@ object AdhocAnalyzer {
   /*
     Experimental
   */
-  def converted(row: scala.collection.Seq[Any]) : Tuple2[Long,SparseVector] = { 
+  def converted(row: scala.collection.Seq[Any]) : Tuple2[String,SparseVector] = { 
     val ret = row.asInstanceOf[WrappedArray[Any]]
-    val first = ret(0).asInstanceOf[Long]
+    val first = ret(0).asInstanceOf[String]
     val second = ret(1).asInstanceOf[Vector]
     Tuple2(first,second.toSparse)
   }
