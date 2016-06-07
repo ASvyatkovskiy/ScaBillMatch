@@ -102,7 +102,7 @@ for input in inputs:
             output_dicts_meta.append(output_dict)
 
 for i, output_dict in enumerate(output_dicts_meta):
-    if use_cryptic_pk: output_dict['primary_key'] = i
+    if not use_cryptic_pk: output_dict['primary_key'] = i
     simplejson.dump(output_dict, foutput_meta)
     foutput_meta.write('\n')
 
@@ -126,6 +126,6 @@ for input in inputs:
             output_dicts.append(output_dict)
 
 for i, output_dict in enumerate(output_dicts):
-    if use_cryptic_pk: output_dict['primary_key'] = i
+    if not use_cryptic_pk: output_dict['primary_key'] = i
     simplejson.dump(output_dict, foutput)
     foutput.write('\n')
