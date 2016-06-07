@@ -56,14 +56,14 @@ object MakeCartesian {
        if (use_strict) {
          //extra condition
          if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
-           if (istate != jstate && iyear < jyear) {
+           if (pk1 < pk2) {
               var output: CartesianPair = CartesianPair(pk1,pk2)
               output_arr += output
            }
          } 
        } else {
          //simple condition
-          if (pk1 < pk2 && iyear <= jyear) {
+          if (pk1 < pk2) {
              var output: CartesianPair = CartesianPair(pk1,pk2)
              output_arr += output
           }
