@@ -73,41 +73,36 @@ object AdhocAnalyzer {
 
     val bills = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
     bills.repartition(col("primary_key"))
-    bills.explain
-    //bills.printSchema()
-    //bills.show() 
+    bills.show(5)
+
+    def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
+    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
+    cleaned_df.show(5)
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
-    var tokenizer = new RegexTokenizer().setInputCol("content").setOutputCol("words").setPattern("\\W")
-    val tokenized_df = tokenizer.transform(bills)
-    //tokenized_df.show(5,false)
+    var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
+    val tokenized_df = tokenizer.transform(cleaned_df)
 
     //remove stopwords 
     var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
     val filtered_df = remover.transform(tokenized_df).drop("words")
-    //filtered_df.printSchema()
-    //filtered_df.show()
 
     //ngram = NGram(n=2, inputCol="filtered", outputCol="ngram")
     //ngram_df = ngram.transform(tokenized_df)
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
+    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures") //.setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
     val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
-    //featurized_df.show(15,false)
 
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("pre_features")
     //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
     var idfModel = idf.fit(featurized_df)
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
-    rescaled_df.show(5) //,false)
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
-    //println(hashed_bills.collect())
 
     //Experimental
     //First, run the hashing step here
-    println(params.getString("adhocAnalyzer.inputPairsFile"))
     val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile")).map(pp => (pp.pk1,pp.pk2))
 
     var distanceMeasure: DistanceMeasure = null
@@ -143,11 +138,11 @@ object AdhocAnalyzer {
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
         .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
-    //println(firstjoin.count())
+
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
-    //matches.collect().foreach(println)
+    
     matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
 
     spark.stop()
