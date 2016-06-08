@@ -91,7 +91,7 @@ object AdhocAnalyzer {
     //ngram_df = ngram.transform(tokenized_df)
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures") //.setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
+    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
     val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
 
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("pre_features")

@@ -99,7 +99,7 @@ object AdhocSectionAnalyzer {
     //ngram_df = ngram.transform(tokenized1_df)
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures") //.setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
+    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
     val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
     featurized_df.show(5)
 
@@ -153,7 +153,8 @@ object AdhocSectionAnalyzer {
     
     //val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).filter({case (k1, k2, v1) => ((k1 contains "CO_2006_HB1175") || (k2 contains "CO_2006_HB1175"))}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
     val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
-    matches_df.write.parquet(params.getString("adhocAnalyzer.outputMainFile"))
+    matches_df.show(100000,false)
+    //matches_df.write.parquet(params.getString("adhocAnalyzer.outputMainFile"))
 
     //matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
 
