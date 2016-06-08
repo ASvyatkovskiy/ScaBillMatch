@@ -71,12 +71,13 @@ us_state_abbrev = {
     'WY':49
 }
 
+#switch between primary key as a long integer and primary key as a string
+use_cryptic_pk = True
+
 import glob
 inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/*")
-#inputs = glob.glob("../data/partition*")
 
 foutput_meta = open("/scratch/network/alexeys/bills/lexs/bills_metadata.json","wa")
-#foutput_meta = open("bills_metadata.json","wa")
 
 #metadata
 output_dicts_meta = list()
@@ -90,10 +91,10 @@ for input in inputs:
             except:
                 blah, bla, state, year, docid, docversion_pre = sid.split("/")
             #if state == 'IL': continue
-            output_dict = {'year':None, 'state':'', 'docversion':'', 'primary_key':None}
+            output_dict = {'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':None}
             output_dict['year'] = int(year)
             output_dict['state'] = us_state_abbrev[state]
-            #output_dict['docid'] = docid
+            output_dict['docid'] = docid
             version = docversion_pre.split("_")[1].rstrip(".txt")
             version = "".join(version.split())
             output_dict['docversion'] = version
@@ -101,16 +102,11 @@ for input in inputs:
             output_dicts_meta.append(output_dict)
 
 for i, output_dict in enumerate(output_dicts_meta):
-    output_dict['primary_key'] = i
+    if not use_cryptic_pk: output_dict['primary_key'] = i
     simplejson.dump(output_dict, foutput_meta)
     foutput_meta.write('\n')
 
-#print len(distinct_keys)
-#print len(distinct_keys2)
-#print distinct_keys2
-
 foutput = open("/scratch/network/alexeys/bills/lexs/bills.json","wa")
-#foutput = open("bills.json","wa")
 
 output_dicts = list()
 for input in inputs:
@@ -130,6 +126,6 @@ for input in inputs:
             output_dicts.append(output_dict)
 
 for i, output_dict in enumerate(output_dicts):
-    output_dict['primary_key'] = i
+    if not use_cryptic_pk: output_dict['primary_key'] = i
     simplejson.dump(output_dict, foutput)
     foutput.write('\n')

@@ -1,4 +1,4 @@
-/*AdhocAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
+/*AdhocSectionAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
 
 Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     nPartitions: Number of partitions in bills_meta RDD
@@ -26,13 +26,14 @@ import org.apache.spark.ml.feature.StopWordsRemover
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.functions.explode
 
 import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
 
-object AdhocAnalyzer {
+object AdhocSectionAnalyzer {
 
   /*
     Experimental
@@ -49,7 +50,7 @@ object AdhocAnalyzer {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit  --class AdhocSectionAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -62,7 +63,7 @@ object AdhocAnalyzer {
 
   def run(params: Config) {
 
-    val conf = new SparkConf().setAppName("AdhocAnalyzer")
+    val conf = new SparkConf().setAppName("AdhocSectionAnalyzer")
       .set("spark.dynamicAllocation.enabled","true")
       .set("spark.shuffle.service.enabled","true")
 
@@ -73,26 +74,34 @@ object AdhocAnalyzer {
 
     val bills = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
     bills.repartition(col("primary_key"))
-    bills.show(5)
+    //bills.show(5)
 
-    def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
-    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
-    cleaned_df.show(5)
+    //cannot do cleaning because I tokenize sections on section - digit pattern
+    //def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
+    //val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
+    //cleaned_df.show(15)
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
-    var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
-    val tokenized_df = tokenizer.transform(cleaned_df)
+    var tokenizer1 = new RegexTokenizer().setInputCol("content").setOutputCol("sections").setPattern("(SECTION \\d|section \\d)")
+    val tokenized1_df = tokenizer1.transform(bills) //cleaned_df)
 
+    //flatten the column
+    val flattened_df = tokenized1_df.withColumn("sections", explode($"sections")).drop("cleaned")
+
+    var tokenizer2 = new RegexTokenizer().setInputCol("sections").setOutputCol("words").setPattern("\\W")
+    val tokenized2_df = tokenizer2.transform(flattened_df)
+ 
     //remove stopwords 
     var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
-    val filtered_df = remover.transform(tokenized_df).drop("words")
+    val filtered_df = remover.transform(tokenized2_df).drop("words")
 
     //ngram = NGram(n=2, inputCol="filtered", outputCol="ngram")
-    //ngram_df = ngram.transform(tokenized_df)
+    //ngram_df = ngram.transform(tokenized1_df)
 
     //hashing
     var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
     val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
+    featurized_df.show(5)
 
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("pre_features")
     //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
@@ -101,7 +110,6 @@ object AdhocAnalyzer {
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
 
-    //Experimental
     //First, run the hashing step here
     val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile")).map(pp => (pp.pk1,pp.pk2))
 
@@ -137,13 +145,18 @@ object AdhocAnalyzer {
 
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
-        .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
+        .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)}).filter({case ((k1, k2), v1) => (k1 != k2)})
 
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
     
-    matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
+    //val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).filter({case (k1, k2, v1) => ((k1 contains "CO_2006_HB1175") || (k2 contains "CO_2006_HB1175"))}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
+    val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
+    matches_df.show(100000,false)
+    //matches_df.write.parquet(params.getString("adhocAnalyzer.outputMainFile"))
+
+    //matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
 
     spark.stop()
    }

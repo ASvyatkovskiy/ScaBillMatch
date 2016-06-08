@@ -56,14 +56,14 @@ object MakeCartesian {
        if (use_strict) {
          //extra condition
          if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
-           if (istate != jstate && iyear < jyear) {
+           if (pk1 < pk2) {
               var output: CartesianPair = CartesianPair(pk1,pk2)
               output_arr += output
            }
          } 
        } else {
          //simple condition
-          if (istate != jstate && iyear < jyear) {
+          if (pk1 < pk2) {
              var output: CartesianPair = CartesianPair(pk1,pk2)
              output_arr += output
           }
@@ -119,6 +119,6 @@ object MakeCartesian {
    }
 }
 
-@serializable case class MetaDocument(primary_key: Long, state: Long, docid: String, docversion: String, year: Long)
-@serializable case class Document(primary_key: Long, content: String)
-@serializable case class CartesianPair(pk1: Long, pk2: Long)
+@serializable case class MetaDocument(primary_key: String, state: Long, docid: String, docversion: String, year: Long)
+@serializable case class Document(primary_key: String, content: String)
+@serializable case class CartesianPair(pk1: String, pk2: String)

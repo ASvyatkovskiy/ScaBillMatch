@@ -5,7 +5,7 @@ Following parameters need to be filled in the resources/documentAnalyzer.conf fi
 	secThreshold: Minimum Jaccard similarity to inspect on section level 
         inputBillsFile: Bill input file, one JSON per line
         inputPairsFile: CartesianPairs object input file
-        outputMainFile: outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
+        outputMainFile: outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
         outputFilteredFile: CartesianPairs passing similarity threshold
 
 Example to explore output in spark-shell:
@@ -68,7 +68,7 @@ object DocumentAnalyzer {
     //matches.collect().foreach(println)
     matches.saveAsObjectFile(params.getString("documentAnalyzer.outputMainFile"))
 
-    //scala.Tuple2[Long, Long]
+    //scala.Tuple2[String, String]
     val threshold = params.getDouble("documentAnalyzer.secThreshold")
     matches.filter(kv => (kv._2 > threshold)).keys.saveAsObjectFile(params.getString("documentAnalyzer.outputFilteredFile"))
 
