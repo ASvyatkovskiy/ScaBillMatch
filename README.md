@@ -34,11 +34,9 @@ res1: Array[CartesianPair] = Array()
 
 Note the `--jars` parameter, which is intended to include various case classes defined in the code to the classpath (namely, `CartesianPair`)
 
-## Calculate document similarity (workflow 1)
+## Calculate document similarity: Rabin-Karpe rolling n-gram and n-gram hashing 
 
 With `DocumentAnalyzer`, one can calculate similarity among feature vectors representing the text documents. All possible combinations of eligible pairs obtained on the previous step are considered.
-
-FIXME expand with details on the method
 
 Following parameters need to be filled in the `resources/documentAnalyzer.conf` file:
 * secThreshold: Minimum Jaccard similarity to inspect on section level 
@@ -46,6 +44,14 @@ Following parameters need to be filled in the `resources/documentAnalyzer.conf` 
 * inputPairsFile: `CartesianPairs` input object file
 * outputMainFile: key-key pairs and corresponding similarities, as `Tuple2[Tuple2[String,String],Double]`
 * outputFilteredFile: `CartesianPairs` passing similarity threshold
+
+### Feature extraction
+
+The text features are extracted from the documents using the Rabin-Karpe rolling n-gram approach. The size of the n-gram is configurable, but smaller sizes are preferred.   
+
+### Similarity calculation
+
+### Examples
 
 Example submit command:
 ```bash
@@ -67,7 +73,10 @@ sorted.foreach(println)
 
 More advanced interactive analysis, including plotting, is possible with `Histogrammar` package described below.
 
-## Calculate document similarity (workflow 2)
+### Section-level similarity 
+
+
+## Calculate document similarity: bag-of-words and TF-IDF
 
 Calculate document/section similarity using bag-of-words and TF-IDF for feature extraction. 
 
@@ -86,7 +95,11 @@ Example submit command:
 spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar
 ```
 
-## Prepare a histogram of similarities
+### Section-level similarity
+
+## Calculate document similarity: locality sensitive hashing
+
+## Exploratory analysis: histogramming and plotting
 
 Considering that the MakeCartesian and analysis steps (for instance, AdhocAnalyzer) have been ran, and the object file conraining 
 the primary key pairs and corresponsing similarities in the format `Tuple2[Tuple2[Long,Long],Double]` is available in HDFS,
@@ -97,7 +110,7 @@ one can easily perform histogram aggregation and visualization steps using Scala
 
 Download and install the Histogrammar package following the isntructions here: http://histogrammar.org
 
-### Interactive data aggragation and plotting
+### Interactive data aggragation
 
 Start the interactive `spark-shell` session pointing to all the Histogrammar jars and the BillAnalysis jars, and do:
 
@@ -121,3 +134,7 @@ firefox --no-remote file:///home/alexeys/similarity.html
 
 Read following documentation pages for more details on `histogrammar` package: http://histogrammar.org/docs/specification/
 And here: http://histogrammar.org/scala/0.6/index.html#package
+
+## Similarity of legislative proposals as a graph problem
+
+PageRank, Dijsktra paths, GraphFrames
