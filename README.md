@@ -56,6 +56,17 @@ Example spark-shell session (Scala) to explore the output:
 ```bash
 ```
 
+Following example shows how to interactively load the output file having a format primary-primary key / similarity value, select only a specific version of document, sort the data by similarity values, print it to the screen:
+
+```scala
+val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alexeys/output").cache()
+val filtered = data.filter({case ((k1,k2),v) => ((k1 contains "CO_2006_HB1175") || (k1 contains "CO_2006_HB1175"))}).cache()
+val sorted = filtered.map(x => x.swap).sortByKey(false).cache()
+sorted.foreach(println)
+```
+
+More advanced interactive analysis, including plotting, is possible with `Histogrammar` package described below.
+
 ## Calculate document similarity (workflow 2)
 
 Calculate document/section similarity using bag-of-words and TF-IDF for feature extraction. 
