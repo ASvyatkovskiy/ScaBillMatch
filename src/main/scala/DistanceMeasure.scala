@@ -42,7 +42,7 @@ private final object EuclideanDistance extends DistanceMeasure {
    * MLlib's public vector distance functionality
    */
   def compute(v1: SparseVector, v2: SparseVector): Double = {
-    Vectors.sqdist(v1, v2)
+    1/(1+Vectors.sqdist(v1, v2))
   }
 }
 
@@ -55,7 +55,7 @@ private final object ManhattanDistance extends DistanceMeasure {
   def compute(v1: SparseVector, v2: SparseVector): Double = {
     val b1 = LinalgShim.toBreeze(v1)
     val b2 = LinalgShim.toBreeze(v2)
-    norm(b1 - b2, 1.0)
+    1 - norm(b1 - b2, 1.0)
   }
 }
 
