@@ -29,7 +29,6 @@ $ spark-shell --jars target/scala-2.10/BillAnalysis-assembly-1.0.jar
 scala> val mydata = sc.objectFile[CartesianPair]("/user/alexeys/valid_pairs")
 mydata: org.apache.spark.rdd.RDD[CartesianPair] = MapPartitionsRDD[3] at objectFile at <console>:27
 scala> mydata.take(5)
-res1: Array[CartesianPair] = Array()
 ```
 
 Note the `--jars` parameter, which is intended to include various case classes defined in the code to the classpath (namely, `CartesianPair`)
@@ -58,19 +57,15 @@ Example submit command:
 spark-submit --class DocumentAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar
 ```
 
-Example spark-shell session (Scala) to explore the output:
+Example spark-shell session (Scala) to explore the output. Following example shows how to interactively load the output file having a format primary-primary key / similarity value, select only a specific version of document, sort the data by similarity values, print top 100 pairs with highest similarity to standard output:
 ```bash
+val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alex/output_docs").cache()
+val filtered_data = data_jaccard.filter({case ((k1,k2),v) => ((k1 contains "CO_2006_HB1175") || (k2 contains "CO_2006_HB1175"))})
+val sorted_data = filtered_data.map(x => x.swap).sortByKey(false)
+for (s <- sorted_data_jaccard.take(100)) {
+   println(s)
+}
 ```
-
-Following example shows how to interactively load the output file having a format primary-primary key / similarity value, select only a specific version of document, sort the data by similarity values, print it to the screen:
-
-```scala
-val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alexeys/output").cache()
-val filtered = data.filter({case ((k1,k2),v) => ((k1 contains "CO_2006_HB1175") || (k1 contains "CO_2006_HB1175"))}).cache()
-val sorted = filtered.map(x => x.swap).sortByKey(false).cache()
-sorted.foreach(println)
-```
-
 More advanced interactive analysis, including plotting, is possible with `Histogrammar` package described below.
 
 ### Section-level similarity 
@@ -101,8 +96,8 @@ spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 30 --ex
 
 ## Exploratory analysis: histogramming and plotting
 
-Considering that the MakeCartesian and analysis steps (for instance, AdhocAnalyzer) have been ran, and the object file conraining 
-the primary key pairs and corresponsing similarities in the format `Tuple2[Tuple2[Long,Long],Double]` is available in HDFS,
+Considering that the `MakeCartesian` and analysis steps (for instance, `AdhocAnalyzer`) have been ran, and the object file conraining 
+the primary key pairs and corresponsing similarities in the format `Tuple2[Tuple2[String,String],Double]` is available in HDFS,
 one can easily perform histogram aggregation and visualization steps using Scala-based `Histogrammar` package.
 
 
@@ -118,18 +113,18 @@ Start the interactive `spark-shell` session pointing to all the Histogrammar jar
 import org.dianahep.histogrammar._
 import org.dianahep.histogrammar.bokeh._
 
-val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alexeys/test_main_output").cache()
+val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alex/output").cache()
 val sim_histogram = Histogram(200, 0, 100, {matches: Tuple2[Tuple2[String,String],Double] => matches._2})
 val final_histogram = data.aggregate(sim_histogram)(new Increment, new Combine)
 
-val my = final_histogram.bokeh().plot()
-save(my,"similarity.html")
+val plot_all = final_histogram.bokeh().plot(xLabel="Jaccard",yLabel="Num. pairs")
+save(plot_all,"similarities.html")
 ```
 
 This will produce an html file with the plot, which you can view by pointing a webbrowser to path to that file, for instance:
 
 ```bash
-firefox --no-remote file:///home/alexeys/similarity.html
+firefox --no-remote file:///path_to_html_file/similarity.html
 ```
 
 Read following documentation pages for more details on `histogrammar` package: http://histogrammar.org/docs/specification/
