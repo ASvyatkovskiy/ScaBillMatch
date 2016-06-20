@@ -1,7 +1,6 @@
 /*AdhocAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
 
 Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
-    nPartitions: Number of partitions in bills_meta RDD
     numTextFeatures: Number of text features to keep in hashingTF
     measureName: Distance measure used
     inputBillsFile: Bill input file, one JSON per line
@@ -71,13 +70,14 @@ object AdhocAnalyzer {
     import sqlContext.implicits._
     
 
-    val bills = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
-    bills.repartition(col("primary_key"))
-    bills.show(5)
+    val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
+    val npartitions = (200*(input.count()/100000)).toInt
+
+    val bills = input.repartition(npartitions,col("primary_key"),col("content"))
+    bills.explain
 
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
-    cleaned_df.show(5)
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
     var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
@@ -98,6 +98,7 @@ object AdhocAnalyzer {
     //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
     var idfModel = idf.fit(featurized_df)
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
+    rescaled_df.show(5)
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
 
