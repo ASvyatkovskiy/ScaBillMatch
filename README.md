@@ -1,16 +1,20 @@
-# Prepare a histogram of similarities
+# ScaBillMatch [![Build Status](https://travis-ci.org/ASvyatkovskiy/ScaBillMatch.svg?branch=master)](https://travis-ci.org/ASvyatkovskiy/ScaBillMatch.svg?branch=master)
+
+Scala based reboot of diffusion study (bill match)
+
+## Prepare a histogram of similarities
 
 Considering that the MakeCartesian and analysis steps (for instance, AdhocAnalyzer) have been ran, and the object file conraining 
 the primary key pairs and corresponsing similarities in the format `Tuple2[Tuple2[Long,Long],Double]` is available in HDFS,
 one can easily perform histogram aggregation and visualization steps using Scala-based `Histogrammar` package.
 
 
-## Download and install `Histogrammar`
+### Download and install `Histogrammar`
 
 Download and install the Histogrammar package following the isntructions here: http://histogrammar.org
 
 
-## Interactive data aggragation and plotting
+### Interactive data aggragation and plotting
 
 Start the interactive `spark-shell` session pointing to all the Histogrammar jars and the BillAnalysis jars, and do:
 
