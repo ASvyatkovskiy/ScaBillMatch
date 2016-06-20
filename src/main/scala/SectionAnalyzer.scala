@@ -12,7 +12,7 @@ object SectionAnalyzer {
  
   def main(args: Array[String]) {
 
-    println(s"\nspark-submit --class SectionAnalyzer --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit --class SectionAnalyzer --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
     val params = ConfigFactory.load("sectionAnalyzer")
