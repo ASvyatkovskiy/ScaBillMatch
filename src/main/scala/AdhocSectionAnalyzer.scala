@@ -71,10 +71,11 @@ object AdhocSectionAnalyzer {
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
     
+    val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
+    val npartitions = (200*(input.count()/100000)).toInt
 
-    val bills = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
-    bills.repartition(col("primary_key"))
-    //bills.show(5)
+    val bills = input.repartition(npartitions,col("primary_key"),col("content"))
+    bills.explain
 
     //cannot do cleaning because I tokenize sections on section - digit pattern
     //def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
@@ -152,9 +153,9 @@ object AdhocSectionAnalyzer {
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
     
     //val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).filter({case (k1, k2, v1) => ((k1 contains "CO_2006_HB1175") || (k2 contains "CO_2006_HB1175"))}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
-    val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
-    matches_df.show(100000,false)
-    //matches_df.write.parquet(params.getString("adhocAnalyzer.outputMainFile"))
+    val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity").select(col("pk1"),col("pk2"),col("max(similarity)").alias("max_similarity"))
+    //matches_df.show(1000,false)
+    matches_df.write.parquet(params.getString("adhocAnalyzer.outputMainFile"))
 
     //matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
 
