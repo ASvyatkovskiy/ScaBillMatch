@@ -5,7 +5,7 @@ Following parameters need to be filled in the resources/documentAnalyzer.conf fi
 	secThreshold: Minimum Jaccard similarity to inspect on section level 
         inputBillsFile: Bill input file, one JSON per line
         inputPairsFile: CartesianPairs object input file
-        outputMainFile: outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[Long,Long],Double]
+        outputMainFile: outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
         outputFilteredFile: CartesianPairs passing similarity threshold
 
 Example to explore output in spark-shell:
@@ -25,7 +25,7 @@ object DocumentAnalyzer {
  
   def main(args: Array[String]) {
 
-    println(s"\nspark-submit --class DocumentAnalyzer --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit --class DocumentAnalyzer --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -68,7 +68,7 @@ object DocumentAnalyzer {
     //matches.collect().foreach(println)
     matches.saveAsObjectFile(params.getString("documentAnalyzer.outputMainFile"))
 
-    //scala.Tuple2[Long, Long]
+    //scala.Tuple2[String, String]
     val threshold = params.getDouble("documentAnalyzer.secThreshold")
     matches.filter(kv => (kv._2 > threshold)).keys.saveAsObjectFile(params.getString("documentAnalyzer.outputFilteredFile"))
 

@@ -32,6 +32,6 @@ object SectionLevelUtils {
            matchCnt += DocumentLevelUtils.extractSimilarities((igrp(isec),jgrp(jsec)))
        } 
     } 
-    matchCnt
+    matchCnt.reduceLeft(_ max _)
   }
 }

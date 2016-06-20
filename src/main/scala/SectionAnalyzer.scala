@@ -11,6 +11,9 @@ object SectionAnalyzer {
   def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
  
   def main(args: Array[String]) {
+
+    println(s"\nExample submit command: spark-submit --class SectionAnalyzer --master yarn-client --num-executors 40 --executor-cores 2 --executor-memory 15g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+
     val t0 = System.nanoTime()
     val params = ConfigFactory.load("sectionAnalyzer")
     run(params)
@@ -33,7 +36,7 @@ object SectionAnalyzer {
     val bills = sqlContext.read.json(params.getString("sectionAnalyzer.inputBillsFile")).as[Document]
 
     val hashed_bills = bills.rdd.map(bill => (bill.primary_key,bill.content)).mapValues(content => SectionLevelUtils.preprocess(content)).cache()
-    val cartesian_pairs = spark.objectFile[Tuple2[Long,Long]](params.getString("sectionAnalyzer.inputFilteredFile"))
+    val cartesian_pairs = spark.objectFile[Tuple2[String,String]](params.getString("sectionAnalyzer.inputFilteredFile"))
 
     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)

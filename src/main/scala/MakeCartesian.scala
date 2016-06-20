@@ -33,6 +33,11 @@ import scala.collection.mutable.WrappedArray
 
 object MakeCartesian {
 
+  def selectUnique(docid: String, metadocs: Iterator[MetaDocument]) : (String,MetaDocument) = {
+     val metadoc = metadocs.toList(0)
+     (docid,metadoc)
+  }
+
   def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int]) : (MetaDocument, Array[CartesianPair]) = {
 
     val documents = thewholething.value
@@ -56,14 +61,14 @@ object MakeCartesian {
        if (use_strict) {
          //extra condition
          if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
-           if (istate != jstate && iyear < jyear) {
+           if (pk1 < pk2 && istate != jstate) {
               var output: CartesianPair = CartesianPair(pk1,pk2)
               output_arr += output
            }
          } 
        } else {
          //simple condition
-          if (istate != jstate && iyear < jyear) {
+          if (pk1 < pk2 && istate != jstate) {
              var output: CartesianPair = CartesianPair(pk1,pk2)
              output_arr += output
           }
@@ -92,16 +97,17 @@ object MakeCartesian {
   def run(params: Config) {
 
     val conf = new SparkConf().setAppName("MakeCartesian")
-      //.set("spark.driver.maxResultSize", "10g")
-      //.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-      //.set("spark.kryoserializer.buffer.mb","24") 
 
     val spark = new SparkContext(conf)
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
 
-    val vv: String = params.getString("makeCartesian.docVersion") //"Enacted"
+    val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
     var bills_meta = sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaDocument].filter(x => x.docversion contains vv).cache()
+
+    if (vv != "") {
+        bills_meta = bills_meta.groupBy(_.docid).mapGroups(selectUnique).map({case (k,v) => (v)}).cache()
+    }
 
     var bills_meta_bcast = spark.broadcast(bills_meta.collect())
 
@@ -119,6 +125,6 @@ object MakeCartesian {
    }
 }
 
-@serializable case class MetaDocument(primary_key: Long, state: Long, docid: String, docversion: String, year: Long)
-@serializable case class Document(primary_key: Long, content: String)
-@serializable case class CartesianPair(pk1: Long, pk2: Long)
+@serializable case class MetaDocument(primary_key: String, state: Long, docid: String, docversion: String, year: Long)
+@serializable case class Document(primary_key: String, content: String)
+@serializable case class CartesianPair(pk1: String, pk2: String)
