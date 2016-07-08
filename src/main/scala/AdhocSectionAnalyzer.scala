@@ -3,7 +3,7 @@
 Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     nPartitions: Number of partitions in bills_meta RDD
     numTextFeatures: Number of text features to keep in hashingTF
-    measureName: Distance measure used
+    measureName: Similarity measure used
     inputBillsFile: Bill input file, one JSON per line
     inputPairsFile: CartesianPairs object input file
     outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
@@ -114,29 +114,29 @@ object AdhocSectionAnalyzer {
     //First, run the hashing step here
     val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile")).map(pp => (pp.pk1,pp.pk2))
 
-    var distanceMeasure: DistanceMeasure = null
+    var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
 
     params.getString("adhocAnalyzer.measureName") match {
       case "cosine" => {
-        distanceMeasure = CosineDistance
+        similarityMeasure = CosineSimilarity
         //threshold = ???
       }
       case "hamming" => {
-        distanceMeasure = HammingDistance
+        similarityMeasure = HammingSimilarity
         //threshold = ???
       }
       case "manhattan" => {
-        distanceMeasure = ManhattanDistance
+        similarityMeasure = ManhattanSimilarity
         //threshold = ???
       }
       case "jaccard" => {
-        distanceMeasure = JaccardDistance
+        similarityMeasure = JaccardSimilarity
         //threshold = ???
       }
       case other: Any =>
         throw new IllegalArgumentException(
-          s"Only hamming, cosine, euclidean, manhattan, and jaccard distances are supported but got $other."
+          s"Only hamming, cosine, euclidean, manhattan, and jaccard similarities are supported but got $other."
         )
     }
 
@@ -146,7 +146,7 @@ object AdhocSectionAnalyzer {
 
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
-        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
+        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => similarityMeasure.compute(v1.toSparse,v2.toSparse)})
     
     //val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).filter({case (k1, k2, v1) => ((k1 contains "CO_2006_HB1175") || (k2 contains "CO_2006_HB1175"))}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity")
     val matches_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("pk1","pk2","similarity").groupBy("pk1","pk2").max("similarity").select(col("pk1"),col("pk2"),col("max(similarity)").alias("max_similarity"))
