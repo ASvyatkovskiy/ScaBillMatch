@@ -49,18 +49,25 @@ private final object ManhattanDistance extends DistanceMeasure {
 }
 
 private final object HammingDistance extends DistanceMeasure {
-
+  
   /**
-   * Compute Hamming distance between vectors
+   * Compute Hamming distance between vectors on a bit-level
    *
-   * Since MLlib doesn't support binary vectors, this uses
-   * sparse vectors and considers any active (i.e. non-zero)
-   * index to represent a set bit
+   * Since MLlib doesn't support binary vectors, this converts
+   * sparse vectors to Byte arrays correponsing to underlying dense representations
    */
+  def numberOfBitsSet(b: Byte) : Int = (0 to 7).map((i : Int) => (b >>> i) & 1).sum
+
   def compute(v1: SparseVector, v2: SparseVector): Double = {
-    v1.indices.intersect(v2.indices).size.toDouble
-  }
+
+    val b1 : Array[Byte] = v1.toDense.values.map(_.toByte)
+    val b2 : Array[Byte] = v2.toDense.values.map(_.toByte)
+
+    val dist = (b1.zip(b2).map((x: (Byte, Byte)) => numberOfBitsSet((x._1 ^ x._2).toByte))).sum
+    100.0/(1.0+dist)
+  } 
 }
+
 
 private final object JaccardDistance extends DistanceMeasure {
 
