@@ -118,10 +118,6 @@ object AdhocAnalyzer {
         distanceMeasure = HammingDistance
         //threshold = ???
       }
-      case "euclidean" => {
-        distanceMeasure = EuclideanDistance
-        //threshold = ???
-      }
       case "manhattan" => {
         distanceMeasure = ManhattanDistance
         //threshold = ???
