@@ -73,7 +73,7 @@ object AdhocAnalyzer {
     val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
     val npartitions = (200*(input.count()/100000)).toInt
 
-    val bills = input.repartition(npartitions,col("primary_key"),col("content"))
+    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
 
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
