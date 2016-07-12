@@ -90,8 +90,7 @@ for input in inputs:
                 bla, state, year, docid, docversion_pre = sid.split("/")
             except:
                 blah, bla, state, year, docid, docversion_pre = sid.split("/")
-            #if state == 'IL': continue
-            output_dict = {'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':None}
+            output_dict = {'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':''}
             output_dict['year'] = int(year)
             output_dict['state'] = us_state_abbrev[state]
             output_dict['docid'] = docid
@@ -101,7 +100,9 @@ for input in inputs:
             output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
             output_dicts_meta.append(output_dict)
 
-for i, output_dict in enumerate(output_dicts_meta):
+unique_output_dicts_meta = {each['primary_key'] : each for each in output_dicts_meta}.values()
+
+for i, output_dict in enumerate(unique_output_dicts_meta):
     if not use_cryptic_pk: output_dict['primary_key'] = i
     simplejson.dump(output_dict, foutput_meta)
     foutput_meta.write('\n')
@@ -118,14 +119,16 @@ for input in inputs:
                 bla, state, year, docid, docversion_pre = sid.split("/")
             except: 
                 blah, bla, state, year, docid, docversion_pre = sid.split("/")
-            #if state == 'IL': continue
             output_dict = {'primary_key':'', 'content':None}
             version = docversion_pre.split("_")[1].rstrip(".txt")
+            version = "".join(version.split())
             output_dict['content'] = content.decode("utf-8",errors='replace')
             output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
             output_dicts.append(output_dict)
 
-for i, output_dict in enumerate(output_dicts):
+unique_output_dicts = {each['primary_key'] : each for each in output_dicts}.values()
+
+for i, output_dict in enumerate(unique_output_dicts):
     if not use_cryptic_pk: output_dict['primary_key'] = i
     simplejson.dump(output_dict, foutput)
     foutput.write('\n')
