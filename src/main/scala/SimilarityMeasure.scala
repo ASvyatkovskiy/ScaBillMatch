@@ -59,12 +59,16 @@ private final object HammingSimilarity extends SimilarityMeasure {
   def numberOfBitsSet(b: Byte) : Int = (0 to 7).map((i : Int) => (b >>> i) & 1).sum
 
   def compute(v1: SparseVector, v2: SparseVector): Double = {
+    if (v1.indices.size < 10) {
+       val b1 : Array[Byte] = v1.toDense.values.map(_.toByte)
+       val b2 : Array[Byte] = v2.toDense.values.map(_.toByte)
 
-    val b1 : Array[Byte] = v1.toDense.values.map(_.toByte)
-    val b2 : Array[Byte] = v2.toDense.values.map(_.toByte)
-
-    val dist = (b1.zip(b2).map((x: (Byte, Byte)) => numberOfBitsSet((x._1 ^ x._2).toByte))).sum
-    100.0/(1.0+dist)
+       val dist = (b1.zip(b2).map((x: (Byte, Byte)) => numberOfBitsSet((x._1 ^ x._2).toByte))).sum
+       100.0/(1.0+dist)
+    } else {
+       val dist = (v1.toDense.values zip v2.toDense.values) count (x => x._1 != x._2)
+       100.0/(1.0+dist)
+    }
   } 
 }
 
