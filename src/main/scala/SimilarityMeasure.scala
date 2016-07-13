@@ -5,23 +5,23 @@ import org.apache.spark.mllib.linalg.LinalgShim
 
 /**
  * This abstract base class provides the interface for
- * distance measures to be used in computing the actual
- * distances between candidate pairs.
+ * similarity measures to be used in computing the actual
+ * similarities between candidate pairs.
  *
- * It's framed in terms of distance rather than similarity
+ * It's framed in terms of similarity rather than similarity
  * to provide a common interface that works for Euclidean
- * distance along with other distances. (Cosine distance is
- * admittedly not a proper distance measure, but is computed
+ * similarity along with other similarities. (Cosine similarity is
+ * admittedly not a proper similarity measure, but is computed
  * similarly nonetheless.)
  */
-private abstract class DistanceMeasure extends Serializable {
+private abstract class SimilarityMeasure extends Serializable {
   def compute(v1: SparseVector, v2: SparseVector): Double
 }
 
-private final object CosineDistance extends DistanceMeasure {
+private final object CosineSimilarity extends SimilarityMeasure {
 
   /**
-   * Compute cosine distance between vectors
+   * Compute cosine similarity between vectors
    *
    * LinalgShim reaches into Spark's private linear algebra
    * code to use a BLAS dot product. Could probably be
@@ -35,10 +35,10 @@ private final object CosineDistance extends DistanceMeasure {
   }
 }
 
-private final object ManhattanDistance extends DistanceMeasure {
+private final object ManhattanSimilarity extends SimilarityMeasure {
 
   /**
-   * Compute Manhattan distance between vectors using
+   * Compute Manhattan similarity between vectors using
    * Breeze vector operations
    */
   def compute(v1: SparseVector, v2: SparseVector): Double = {
@@ -48,10 +48,10 @@ private final object ManhattanDistance extends DistanceMeasure {
   }
 }
 
-private final object HammingDistance extends DistanceMeasure {
+private final object HammingSimilarity extends SimilarityMeasure {
   
   /**
-   * Compute Hamming distance between vectors on a bit-level
+   * Compute Hamming similarity between vectors on a bit-level
    *
    * Since MLlib doesn't support binary vectors, this converts
    * sparse vectors to Byte arrays correponsing to underlying dense representations
@@ -59,20 +59,24 @@ private final object HammingDistance extends DistanceMeasure {
   def numberOfBitsSet(b: Byte) : Int = (0 to 7).map((i : Int) => (b >>> i) & 1).sum
 
   def compute(v1: SparseVector, v2: SparseVector): Double = {
+    if (v1.indices.size < 10) {
+       val b1 : Array[Byte] = v1.toDense.values.map(_.toByte)
+       val b2 : Array[Byte] = v2.toDense.values.map(_.toByte)
 
-    val b1 : Array[Byte] = v1.toDense.values.map(_.toByte)
-    val b2 : Array[Byte] = v2.toDense.values.map(_.toByte)
-
-    val dist = (b1.zip(b2).map((x: (Byte, Byte)) => numberOfBitsSet((x._1 ^ x._2).toByte))).sum
-    100.0/(1.0+dist)
+       val dist = (b1.zip(b2).map((x: (Byte, Byte)) => numberOfBitsSet((x._1 ^ x._2).toByte))).sum
+       100.0/(1.0+dist)
+    } else {
+       val dist = (v1.toDense.values zip v2.toDense.values) count (x => x._1 != x._2)
+       100.0/(1.0+dist)
+    }
   } 
 }
 
 
-private final object JaccardDistance extends DistanceMeasure {
+private final object JaccardSimilarity extends SimilarityMeasure {
 
   /**
-   * Compute Jaccard distance between vectors
+   * Compute Jaccard similarity between vectors
    *
    * Since MLlib doesn't support binary vectors, this uses
    * sparse vectors and considers any active (i.e. non-zero)

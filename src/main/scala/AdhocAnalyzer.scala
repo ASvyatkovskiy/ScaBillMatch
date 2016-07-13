@@ -2,7 +2,7 @@
 
 Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     numTextFeatures: Number of text features to keep in hashingTF
-    measureName: Distance measure used
+    measureName: Similarity measure used
     inputBillsFile: Bill input file, one JSON per line
     inputPairsFile: CartesianPairs object input file
     outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
@@ -73,7 +73,7 @@ object AdhocAnalyzer {
     val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
     val npartitions = (200*(input.count()/100000)).toInt
 
-    val bills = input.repartition(npartitions,col("primary_key"),col("content"))
+    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
 
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
@@ -106,33 +106,29 @@ object AdhocAnalyzer {
     //First, run the hashing step here
     val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile")).map(pp => (pp.pk1,pp.pk2))
 
-    var distanceMeasure: DistanceMeasure = null
+    var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
 
     params.getString("adhocAnalyzer.measureName") match {
       case "cosine" => {
-        distanceMeasure = CosineDistance
+        similarityMeasure = CosineSimilarity
         //threshold = ???
       }
       case "hamming" => {
-        distanceMeasure = HammingDistance
-        //threshold = ???
-      }
-      case "euclidean" => {
-        distanceMeasure = EuclideanDistance
+        similarityMeasure = HammingSimilarity
         //threshold = ???
       }
       case "manhattan" => {
-        distanceMeasure = ManhattanDistance
+        similarityMeasure = ManhattanSimilarity
         //threshold = ???
       }
       case "jaccard" => {
-        distanceMeasure = JaccardDistance
+        similarityMeasure = JaccardSimilarity
         //threshold = ???
       }
       case other: Any =>
         throw new IllegalArgumentException(
-          s"Only hamming, cosine, euclidean, manhattan, and jaccard distances are supported but got $other."
+          s"Only hamming, cosine, euclidean, manhattan, and jaccard similarities are supported but got $other."
         )
     }
 
@@ -142,7 +138,7 @@ object AdhocAnalyzer {
 
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
-        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => distanceMeasure.compute(v1.toSparse,v2.toSparse)})
+        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => similarityMeasure.compute(v1.toSparse,v2.toSparse)})
     
     matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
 

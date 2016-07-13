@@ -33,11 +33,6 @@ import scala.collection.mutable.WrappedArray
 
 object MakeCartesian {
 
-  def selectUnique(docid: String, metadocs: Iterator[MetaDocument]) : (String,MetaDocument) = {
-     val metadoc = metadocs.toList(0)
-     (docid,metadoc)
-  }
-
   def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int]) : (MetaDocument, Array[CartesianPair]) = {
 
     val documents = thewholething.value
@@ -103,11 +98,7 @@ object MakeCartesian {
     import sqlContext.implicits._
 
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
-    var bills_meta = sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaDocument].filter(x => x.docversion contains vv).cache()
-
-    if (vv != "") {
-        bills_meta = bills_meta.groupBy(_.docid).mapGroups(selectUnique).map({case (k,v) => (v)}).cache()
-    }
+    var bills_meta = sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaDocument].filter(x => x.docversion == vv).cache()
 
     var bills_meta_bcast = spark.broadcast(bills_meta.collect())
 
