@@ -4,6 +4,7 @@ Application: MakeCartesian, produce all the pairs of primary keys of the documen
 Following parameters need to be filled in the resources/makeCartesian.conf file:
 	docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted...
 	nPartitions: number of partitions in bills_meta RDD
+        onlyInOut: a switch between in-out of state and using both in-out and in-in state pairs
 	use_strict: boolean, yes or no to consider strict parameters
 	strict_state: specify state (a long integer from 1 to 50) for one-against-all user selection (strict)
 	strict_docid: specify document ID for one-against-all user selection (strict)
@@ -33,7 +34,7 @@ import scala.collection.mutable.WrappedArray
 
 object MakeCartesian {
 
-  def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int]) : (MetaDocument, Array[CartesianPair]) = {
+  def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int], onlyInOut: Bool) : (MetaDocument, Array[CartesianPair]) = {
 
     val documents = thewholething.value
 
@@ -62,12 +63,20 @@ object MakeCartesian {
            }
          } 
        } else {
-         //simple condition
-          if (pk1 < pk2 && istate != jstate) {
-             var output: CartesianPair = CartesianPair(pk1,pk2)
-             output_arr += output
-          }
-       }
+          //simple condition
+          if (onlyInOut) {
+             if (pk1 < pk2 && istate != jstate) {
+                var output: CartesianPair = CartesianPair(pk1,pk2)
+                output_arr += output
+             }
+           } else {
+             //in-out and in-in
+             if (pk1 < pk2) {
+                var output: CartesianPair = CartesianPair(pk1,pk2)
+                output_arr += output
+             }
+           } 
+        }
      }
      (document,output_arr.toArray)
   }
@@ -106,7 +115,7 @@ object MakeCartesian {
 
     //will be array of tuples, but the keys are unique
     var cartesian_pairs = bills_meta.rdd.repartition(params.getInt("makeCartesian.nPartitions"))
-                          .map(x => pairup(x,bills_meta_bcast, strict_params))
+                          .map(x => pairup(x,bills_meta_bcast, strict_params, params.getInt("makeCartesian.onlyInOut")))
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
