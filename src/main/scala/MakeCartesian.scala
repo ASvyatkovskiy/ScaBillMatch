@@ -34,7 +34,7 @@ import scala.collection.mutable.WrappedArray
 
 object MakeCartesian {
 
-  def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int], onlyInOut: Bool) : (MetaDocument, Array[CartesianPair]) = {
+  def pairup (document: MetaDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int], onlyInOut: Boolean) : (MetaDocument, Array[CartesianPair]) = {
 
     val documents = thewholething.value
 
@@ -115,7 +115,7 @@ object MakeCartesian {
 
     //will be array of tuples, but the keys are unique
     var cartesian_pairs = bills_meta.rdd.repartition(params.getInt("makeCartesian.nPartitions"))
-                          .map(x => pairup(x,bills_meta_bcast, strict_params, params.getInt("makeCartesian.onlyInOut")))
+                          .map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
