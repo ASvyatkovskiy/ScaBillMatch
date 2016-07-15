@@ -15,7 +15,9 @@ foutput = open("/scratch/network/alexeys/bills/lexs/sectioned_bills_50000.json",
 sec_output_dicts = list()
 for line in finput.readlines():
     output_dict = simplejson.loads(line)
-    for j,section in enumerate(re.split("SECTION \d|section \d",output_dict['content'])):
+    sections = re.split("SECTION \d|section \d",output_dict['content']) 
+    filtered = filter(lambda x: len(x) > 170,sections)
+    for j,section in enumerate(filtered):
         sec_output_dict = {'primary_key':'', 'content':None} 
 
         sec_output_dict['content'] = section
@@ -38,7 +40,9 @@ sec_output_dicts_meta = list()
 for line_meta, line in zip(finput_meta.readlines(),finput.readlines()):
     output_dict_meta = simplejson.loads(line_meta)
     output_dict = simplejson.loads(line)
-    for j in range(len(re.split("SECTION \d|section \d",output_dict['content']))):
+    sections = re.split("SECTION \d|section \d",output_dict['content'])
+    filtered = filter(lambda x: len(x) > 170,sections)
+    for j in range(len(filtered)):
         sec_output_dict_meta = {'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':''}
         sec_output_dict_meta['primary_key'] = str(j)+"_"+output_dict_meta['primary_key']
         sec_output_dict_meta['year'] = output_dict_meta['year']
