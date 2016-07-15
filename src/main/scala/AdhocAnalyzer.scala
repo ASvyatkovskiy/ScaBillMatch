@@ -2,6 +2,8 @@
 
 Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     numTextFeatures: Number of text features to keep in hashingTF
+    addNGramFeatures: Boolean flag to indicate whether to add n-gram features
+    nGramGranularity: granularity of a rolling n-gram
     measureName: Similarity measure used
     inputBillsFile: Bill input file, one JSON per line
     inputPairsFile: CartesianPairs object input file
@@ -33,9 +35,6 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 
 object AdhocAnalyzer {
 
-  /*
-    Experimental
-  */
   def converted(row: scala.collection.Seq[Any]) : Tuple2[String,SparseVector] = { 
     val ret = row.asInstanceOf[WrappedArray[Any]]
     val first = ret(0).asInstanceOf[String]
@@ -58,6 +57,10 @@ object AdhocAnalyzer {
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
   }
+
+  def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
+     a ++ b
+  }  
 
   def run(params: Config) {
 
@@ -85,24 +88,31 @@ object AdhocAnalyzer {
 
     //remove stopwords 
     var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
-    val filtered_df = remover.transform(tokenized_df).drop("words")
+    var prefeaturized_df = remover.transform(tokenized_df).drop("words")
 
-    //ngram = NGram(n=2, inputCol="filtered", outputCol="ngram")
-    //ngram_df = ngram.transform(tokenized_df)
+    if (params.getBoolean("adhocAnalyzer.addNGramFeatures")) {
+
+       val ngram = new NGram().setN(params.getInt("adhocAnalyzer.nGramGranularity")).setInputCol("filtered").setOutputCol("ngram")
+       val ngram_df = ngram.transform(prefeaturized_df)
+
+       def appendFeature_udf = udf(appendFeature _)
+       prefeaturized_df = ngram_df.withColumn("combined", appendFeature_udf(col("filtered"),col("ngram"))).drop("filtered").drop("ngram").drop("cleaned")
+    } else {
+       prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("filtered").alias("combined"))
+       prefeaturized_df.printSchema()
+    }
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
-    val featurized_df = hashingTF.transform(filtered_df).drop("filtered")
+    var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
+    val featurized_df = hashingTF.transform(prefeaturized_df)
 
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("pre_features")
     //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
     var idfModel = idf.fit(featurized_df)
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
-    rescaled_df.show(5)
 
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
 
-    //Experimental
     //First, run the hashing step here
     val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile")).map(pp => (pp.pk1,pp.pk2))
 
