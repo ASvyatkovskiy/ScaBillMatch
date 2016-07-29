@@ -89,8 +89,8 @@ object KMeansAnalyzer {
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
     
-
-    val input = sqlContext.read.json(params.getString("kmeansAnalyzer.inputBillsFile"))
+    val vv: String = params.getString("kmeansAnalyzer.docVersion") //like "Enacted"
+    val input = sqlContext.read.json(params.getString("kmeansAnalyzer.inputBillsFile")).filter($"docversion" === vv)
     val npartitions = (400*(input.count()/100000)).toInt
 
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content")) //.filter("docversion == Introduced")

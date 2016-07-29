@@ -32,6 +32,7 @@ import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
+import java.io._
 
 object AdhocAnalyzer {
 
@@ -47,7 +48,7 @@ object AdhocAnalyzer {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -58,9 +59,24 @@ object AdhocAnalyzer {
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
   }
 
+
+  def customNPartitions(directory: File) : Int = {
+      var len = 0.0
+      val all: Array[File] = directory.listFiles()
+      for (f <- all) {
+        if (f.isFile())
+            len = len + f.length()
+        else
+            len = len + customNPartitions(f)
+      }
+      //353 GB worked with 7000 partitions
+      val npartitions = (7000.*(len/350000000000.)).toInt
+      npartitions  
+  }
+
   def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
      a ++ b
-  }  
+  }   
 
   def run(params: Config) {
 
@@ -72,9 +88,9 @@ object AdhocAnalyzer {
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
     
-
-    val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile"))
-    val npartitions = (200*(input.count()/100000)).toInt
+    val vv: String = params.getString("adhocAnalyzer.docVersion") //like "Enacted"
+    val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile")).filter($"docversion" === vv)
+    val npartitions = (400*(input.count()/100000)).toInt
 
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
@@ -114,7 +130,9 @@ object AdhocAnalyzer {
     val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
 
     //First, run the hashing step here
-    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile")).map(pp => (pp.pk1,pp.pk2))
+    val nPartJoin = customNPartitions(new File(params.getString("adhocAnalyzer.inputPairsFile")))
+    println("\nRunning joins with ",nPartJoin," partitions")
+    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile"),nPartJoin).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
