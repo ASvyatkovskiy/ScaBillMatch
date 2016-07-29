@@ -45,7 +45,7 @@ object MakeLabeledCartesian {
     val iyear = document.year
     val idocid = document.docid
     val pk1 = document.primary_key
-    val label1 = document.label
+    val label1 = document.prediction
 
     //var output_premap: Tuple2(MetaLabeledDocument, Array[CartesianPair]) = Tuple2()
     var output_arr: ArrayBuffer[CartesianPair] = new ArrayBuffer[CartesianPair]()
@@ -55,7 +55,7 @@ object MakeLabeledCartesian {
        val jstate = jevent.state
        val jyear = jevent.year
        val pk2 = jevent.primary_key
-       val label2 = jevent.label
+       val label2 = jevent.prediction
        if (use_strict) {
          //extra condition
          if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
@@ -127,4 +127,4 @@ object MakeLabeledCartesian {
    }
 }
 
-@serializable case class MetaLabeledDocument(primary_key: String, label: Long, state: Long, docid: String, docversion: String, year: Long)
+@serializable case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long)
