@@ -4,10 +4,8 @@ Following parameters need to be filled in the resources/kmeansAnalyzer.conf file
     numTextFeatures: Number of text features to keep in hashingTF
     addNGramFeatures: Boolean flag to indicate whether to add n-gram features
     nGramGranularity: granularity of a rolling n-gram
-    measureName: Similarity measure used
     inputBillsFile: Bill input file, one JSON per line
-    outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
-    outputFilteredFile: CartesianPairs passing similarity threshold
+    outputMainFile: 
 */
 
 import com.typesafe.config._
