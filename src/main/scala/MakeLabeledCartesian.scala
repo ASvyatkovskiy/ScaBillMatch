@@ -128,5 +128,3 @@ object MakeLabeledCartesian {
 }
 
 @serializable case class MetaLabeledDocument(primary_key: String, label: Long, state: Long, docid: String, docversion: String, year: Long)
-@serializable case class Document(primary_key: String, content: String)
-@serializable case class CartesianPair(pk1: String, pk2: String)
