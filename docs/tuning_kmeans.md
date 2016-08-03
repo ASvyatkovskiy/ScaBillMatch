@@ -25,17 +25,60 @@ To validate the accuracy, we need to also make sure that all bills tagged as sta
 all end up in the same class:
 
 ```scala
-val data = sqlContext.read.parquet("/user/alexeys/kMeansLabels_FL_MI_SC").cache()
+val data = sqlContext.read.parquet("/user/alexeys/kMeansLabels_20").cache()
 val filtered_data = data.filter($"primary_key" === "FL_2005_SB436_Introduced") 
 ```
 
-And test:
+And test that they all belong to the same class:
 
 ```scala
+scala> val data = sqlContext.read.parquet("/user/alexeys/kMeansLabels_20").cache()
+data: org.apache.spark.sql.DataFrame = [primary_key: string, prediction: int]
+
+scala> 
+
+scala> val filtered_data = data.filter($"primary_key" === "FL_2005_SB436_Introduced")
+filtered_data: org.apache.spark.sql.DataFrame = [primary_key: string, prediction: int]
+
 scala> filtered_data.show(false)
 +------------------------+----------+
 |primary_key             |prediction|
 +------------------------+----------+
-|FL_2005_SB436_Introduced|15        |
+|FL_2005_SB436_Introduced|62        |
 +------------------------+----------+
+
+
+scala> val filtered_data = data.filter($"primary_key" === "SC_2005_HB4301_Introduced")
+filtered_data: org.apache.spark.sql.DataFrame = [primary_key: string, prediction: int]
+
+scala> filtered_data.show(false)
++-------------------------+----------+
+|primary_key              |prediction|
++-------------------------+----------+
+|SC_2005_HB4301_Introduced|62        |
++-------------------------+----------+
+
+
+scala> val filtered_data = data.filter($"primary_key" === "MI_2005_SB1046_Introduced")
+filtered_data: org.apache.spark.sql.DataFrame = [primary_key: string, prediction: int]
+
+scala> filtered_data.show(false)
++-------------------------+----------+
+|primary_key              |prediction|
++-------------------------+----------+
+|MI_2005_SB1046_Introduced|62        |
++-------------------------+----------+
+
+
+scala> val filtered_data = data.filter($"primary_key" === "MI_2005_HB5153_Introduced")
+filtered_data: org.apache.spark.sql.DataFrame = [primary_key: string, prediction: int]
+
+scala> filtered_data.show(false)
++-------------------------+----------+
+|primary_key              |prediction|
++-------------------------+----------+
+|MI_2005_HB5153_Introduced|62        |
++-------------------------+----------+
 ```
+
+Note: test with 20 states showed the optimal number lays between 150 and 200 classes.
