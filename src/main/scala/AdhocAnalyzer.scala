@@ -127,12 +127,12 @@ object AdhocAnalyzer {
     var idfModel = idf.fit(featurized_df)
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
 
-    val hashed_bills = featurized_df.select("primary_key","rawFeatures").rdd.map(row => converted(row.toSeq))
+    val hashed_bills = rescaled_df.select("primary_key","pre_features").rdd.map(row => converted(row.toSeq))
 
     //First, run the hashing step here
-    val nPartJoin = customNPartitions(new File(params.getString("adhocAnalyzer.inputPairsFile")))
-    println("\nRunning joins with ",nPartJoin," partitions")
-    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile"),nPartJoin).map(pp => (pp.pk1,pp.pk2))
+    val nPartJoin = 2*customNPartitions(new File(params.getString("adhocAnalyzer.inputPairsFile")))
+    println("Running join with ",nPartJoin," partitions")
+    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
