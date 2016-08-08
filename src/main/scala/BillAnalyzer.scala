@@ -1,4 +1,4 @@
-/*AdhocAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
+/*BillAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
 
 Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
     numTextFeatures: Number of text features to keep in hashingTF
@@ -34,7 +34,7 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 
 import java.io._
 
-object AdhocAnalyzer {
+object BillAnalyzer {
 
   def converted(row: scala.collection.Seq[Any]) : Tuple2[String,SparseVector] = { 
     val ret = row.asInstanceOf[WrappedArray[Any]]
@@ -48,7 +48,7 @@ object AdhocAnalyzer {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit  --class BillAnalyzer --master yarn-client --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -80,7 +80,7 @@ object AdhocAnalyzer {
 
   def run(params: Config) {
 
-    val conf = new SparkConf().setAppName("AdhocAnalyzer")
+    val conf = new SparkConf().setAppName("BillAnalyzer")
       .set("spark.dynamicAllocation.enabled","true")
       .set("spark.shuffle.service.enabled","true")
 
@@ -89,8 +89,10 @@ object AdhocAnalyzer {
     import sqlContext.implicits._
     
     val vv: String = params.getString("adhocAnalyzer.docVersion") //like "Enacted"
-    val input = sqlContext.read.json(params.getString("adhocAnalyzer.inputBillsFile")).filter($"docversion" === vv)
-    val npartitions = (400*(input.count()/100000)).toInt
+
+    val jsonSchema = sqlContext.read.json(spark.parallelize(Array("""{"docversion": "str", "docid": "str", "primary_key": "str", "content": "str"}""")))
+    val input = sqlContext.read.format("json").schema(jsonSchema.schema).load(params.getString("adhocAnalyzer.inputBillsFile")).filter($"docversion" === vv)
+    val npartitions = (4*(input.count()/1000)).toInt
 
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
@@ -131,7 +133,7 @@ object AdhocAnalyzer {
 
     //First, run the hashing step here
     val nPartJoin = 2*customNPartitions(new File(params.getString("adhocAnalyzer.inputPairsFile")))
-    println("Running join with ",nPartJoin," partitions")
+    println("Running join with "+nPartJoin+" partitions")
     val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
