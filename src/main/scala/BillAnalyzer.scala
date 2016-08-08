@@ -48,7 +48,7 @@ object BillAnalyzer {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit  --class BillAnalyzer --master yarn-client --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit  --class BillAnalyzer --master yarn-client --queue production --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
 

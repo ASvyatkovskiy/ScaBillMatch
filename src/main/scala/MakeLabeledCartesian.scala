@@ -31,6 +31,22 @@ import org.apache.spark.sql.functions._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
+import org.apache.spark.ml.feature.{HashingTF, IDF}
+import org.apache.spark.ml.feature.{RegexTokenizer, Tokenizer}
+import org.apache.spark.ml.feature.NGram
+import org.apache.spark.ml.feature.StopWordsRemover
+
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.types._
+
+import scala.collection.mutable.WrappedArray
+
+import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
+
+import java.io._
+
+import org.apache.spark.ml.clustering.KMeans
+
 
 object MakeLabeledCartesian {
 
@@ -85,10 +101,30 @@ object MakeLabeledCartesian {
 
   //get type of var utility 
   def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
- 
+
+  def converted(row: scala.collection.Seq[Any]) : Tuple2[String,SparseVector] = {
+    val ret = row.asInstanceOf[WrappedArray[Any]]
+    val first = ret(0).asInstanceOf[String]
+    val second = ret(1).asInstanceOf[Vector]
+    Tuple2(first,second.toSparse)
+  }
+
+  def customNPartitions(directory: File) : Int = {
+      var len = 0.0
+      val all: Array[File] = directory.listFiles()
+      for (f <- all) {
+        if (f.isFile())
+            len = len + f.length()
+        else
+            len = len + customNPartitions(f)
+      }
+      //353 GB worked with 7000 partitions
+      (7*len/350000000).toInt
+  }
+
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit --class MakeLabeledCartesian --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit --class MakeLabeledCartesian --master yarn-client --queue production --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -103,14 +139,65 @@ object MakeLabeledCartesian {
   def run(params: Config) {
 
     val conf = new SparkConf().setAppName("MakeLabeledCartesian")
+      .set("spark.dynamicAllocation.enabled","true")
+      .set("spark.shuffle.service.enabled","true")
 
     val spark = new SparkContext(conf)
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
 
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
-    var bills_meta = sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaLabeledDocument].filter(x => x.docversion == vv).cache()
+    val input = sqlContext.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv)
+    val npartitions = (4*input.count()/1000).toInt
 
+    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
+    bills.explain
+
+    def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
+    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content")))  //.drop("content")
+
+    //tokenizer = Tokenizer(inputCol="text", outputCol="words")
+    var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
+    val tokenized_df = tokenizer.transform(cleaned_df)
+
+    //remove stopwords 
+    var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
+    var prefeaturized_df = remover.transform(tokenized_df).drop("words")
+
+    //hashing
+    var hashingTF = new HashingTF().setInputCol("filtered").setOutputCol("rawFeatures").setNumFeatures(params.getInt("makeCartesian.numTextFeatures"))
+    val featurized_df = hashingTF.transform(prefeaturized_df)
+
+    var idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
+    //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
+    var idfModel = idf.fit(featurized_df)
+    val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
+
+    // Trains a k-means model
+    /*
+     setDefault(
+    k -> 2,
+    maxIter -> 20,
+    initMode -> MLlibKMeans.K_MEANS_PARALLEL,
+    initSteps -> 5,
+    tol -> 1e-4)
+    */
+    val kval: Int = 150
+    val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    val model = kmeans.fit(rescaled_df)
+
+    var clusters_df = model.transform(rescaled_df)
+
+    val WSSSE = model.computeCost(rescaled_df)
+    println("Within Set Sum of Squared Errors = " + WSSSE)
+    //model.explainParams()
+
+    val explained = model.extractParamMap()
+    println(explained)
+
+    var bills_meta = clusters_df.select("primary_key","docversion","docid","content","state","year","prediction").as[MetaLabeledDocument]
+    bills_meta.printSchema()
+ //sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaLabeledDocument].filter(x => x.docversion == vv).cache()
     var bills_meta_bcast = spark.broadcast(bills_meta.collect())
 
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
@@ -128,3 +215,4 @@ object MakeLabeledCartesian {
 }
 
 @serializable case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long)
+@serializable case class CartesianPair(pk1: String, pk2: String)
