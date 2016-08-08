@@ -83,6 +83,7 @@ object BillAnalyzer {
     val conf = new SparkConf().setAppName("BillAnalyzer")
       .set("spark.dynamicAllocation.enabled","true")
       .set("spark.shuffle.service.enabled","true")
+      .set("spark.sql.codegen.wholeStage", "true")
 
     val spark = new SparkContext(conf)
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
