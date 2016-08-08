@@ -1,6 +1,6 @@
 /*BillAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
 
-Following parameters need to be filled in the resources/adhocAnalyzer.conf file:
+Following parameters need to be filled in the resources/billAnalyzer.conf file:
     numTextFeatures: Number of text features to keep in hashingTF
     addNGramFeatures: Boolean flag to indicate whether to add n-gram features
     nGramGranularity: granularity of a rolling n-gram
@@ -52,7 +52,7 @@ object BillAnalyzer {
 
     val t0 = System.nanoTime()
 
-    val params = ConfigFactory.load("adhocAnalyzer")
+    val params = ConfigFactory.load("billAnalyzer")
     run(params)
 
     val t1 = System.nanoTime()
@@ -88,10 +88,10 @@ object BillAnalyzer {
     val sqlContext = new org.apache.spark.sql.SQLContext(spark)
     import sqlContext.implicits._
     
-    val vv: String = params.getString("adhocAnalyzer.docVersion") //like "Enacted"
+    val vv: String = params.getString("billAnalyzer.docVersion") //like "Enacted"
 
     val jsonSchema = sqlContext.read.json(spark.parallelize(Array("""{"docversion": "str", "docid": "str", "primary_key": "str", "content": "str"}""")))
-    val input = sqlContext.read.format("json").schema(jsonSchema.schema).load(params.getString("adhocAnalyzer.inputBillsFile")).filter($"docversion" === vv)
+    val input = sqlContext.read.format("json").schema(jsonSchema.schema).load(params.getString("billAnalyzer.inputBillsFile")).filter($"docversion" === vv)
     val npartitions = (4*(input.count()/1000)).toInt
 
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
@@ -108,9 +108,9 @@ object BillAnalyzer {
     var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
     var prefeaturized_df = remover.transform(tokenized_df).drop("words")
 
-    if (params.getBoolean("adhocAnalyzer.addNGramFeatures")) {
+    if (params.getBoolean("billAnalyzer.addNGramFeatures")) {
 
-       val ngram = new NGram().setN(params.getInt("adhocAnalyzer.nGramGranularity")).setInputCol("filtered").setOutputCol("ngram")
+       val ngram = new NGram().setN(params.getInt("billAnalyzer.nGramGranularity")).setInputCol("filtered").setOutputCol("ngram")
        val ngram_df = ngram.transform(prefeaturized_df)
 
        def appendFeature_udf = udf(appendFeature _)
@@ -121,7 +121,7 @@ object BillAnalyzer {
     }
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(params.getInt("adhocAnalyzer.numTextFeatures"))
+    var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(params.getInt("billAnalyzer.numTextFeatures"))
     val featurized_df = hashingTF.transform(prefeaturized_df)
 
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("pre_features")
@@ -132,14 +132,14 @@ object BillAnalyzer {
     val hashed_bills = rescaled_df.select("primary_key","pre_features").rdd.map(row => converted(row.toSeq))
 
     //First, run the hashing step here
-    val nPartJoin = 2*customNPartitions(new File(params.getString("adhocAnalyzer.inputPairsFile")))
+    val nPartJoin = 2*customNPartitions(new File(params.getString("billAnalyzer.inputPairsFile")))
     println("Running join with "+nPartJoin+" partitions")
-    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("adhocAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
 
-    params.getString("adhocAnalyzer.measureName") match {
+    params.getString("billAnalyzer.measureName") match {
       case "cosine" => {
         similarityMeasure = CosineSimilarity
         //threshold = ???
@@ -170,7 +170,7 @@ object BillAnalyzer {
         .join(hashed_bills)
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => similarityMeasure.compute(v1.toSparse,v2.toSparse)})
     
-    matches.saveAsObjectFile(params.getString("adhocAnalyzer.outputMainFile"))
+    matches.saveAsObjectFile(params.getString("billAnalyzer.outputMainFile"))
 
     spark.stop()
    }
