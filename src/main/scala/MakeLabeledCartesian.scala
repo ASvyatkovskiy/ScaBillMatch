@@ -195,7 +195,7 @@ object MakeLabeledCartesian {
     val explained = model.extractParamMap()
     println(explained)
 
-    var bills_meta = clusters_df.select("primary_key","docversion","docid","content","state","year","prediction").as[MetaLabeledDocument]
+    var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction").as[MetaLabeledDocument]
     bills_meta.printSchema()
  //sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaLabeledDocument].filter(x => x.docversion == vv).cache()
     var bills_meta_bcast = spark.broadcast(bills_meta.collect())
