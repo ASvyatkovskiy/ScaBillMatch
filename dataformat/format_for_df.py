@@ -75,9 +75,9 @@ us_state_abbrev = {
 use_cryptic_pk = True
 
 import glob
-inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/partition*")
+inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_10states/*/*/catalog_*")
 
-foutput_combined = open("/scratch/network/alexeys/bills/lexs/bills_combined_3.json","wa")
+foutput_combined = open("/scratch/network/alexeys/bills/lexs/bills_combined_10.json","wa")
 
 #metadata
 output_dicts_combined = list()
@@ -86,10 +86,15 @@ for input in inputs:
         lines = finput.readlines()
         for line in lines:
             sid, content = line.split("^^^")
-            try: 
-                bla, state, year, docid, docversion_pre = sid.split("/")
-            except:
-                blah, bla, state, year, docid, docversion_pre = sid.split("/")
+            split_sid = sid.split("/")
+            if len(split_sid) == 5: 
+                bla, state, year, docid, docversion_pre = split_sid
+            elif len(split_sid) == 6:
+                blah, bla, state, year, docid, docversion_pre = split_sid
+            else: 
+                print "Tokenization issue in file: ", input
+                break
+ 
             output_dict = {'content':None, 'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':''}
             output_dict['year'] = int(year)
             output_dict['state'] = us_state_abbrev[state]
@@ -100,6 +105,7 @@ for input in inputs:
             output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
             output_dict['content'] = content.decode("utf-8",errors='replace')
             output_dicts_combined.append(output_dict)
+
 
 unique_output_dicts_combined = {each['primary_key'] : each for each in output_dicts_combined}.values()
 
