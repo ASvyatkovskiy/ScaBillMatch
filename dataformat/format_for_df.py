@@ -75,12 +75,12 @@ us_state_abbrev = {
 use_cryptic_pk = True
 
 import glob
-inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/*")
+inputs = glob.glob("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/partition*")
 
-foutput_meta = open("/scratch/network/alexeys/bills/lexs/bills_metadata.json","wa")
+foutput_combined = open("/scratch/network/alexeys/bills/lexs/bills_combined_3.json","wa")
 
 #metadata
-output_dicts_meta = list()
+output_dicts_combined = list()
 for input in inputs:
     with open(input,mode="r") as finput:
         lines = finput.readlines()
@@ -90,7 +90,7 @@ for input in inputs:
                 bla, state, year, docid, docversion_pre = sid.split("/")
             except:
                 blah, bla, state, year, docid, docversion_pre = sid.split("/")
-            output_dict = {'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':''}
+            output_dict = {'content':None, 'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':''}
             output_dict['year'] = int(year)
             output_dict['state'] = us_state_abbrev[state]
             output_dict['docid'] = docid
@@ -98,37 +98,12 @@ for input in inputs:
             version = "".join(version.split())
             output_dict['docversion'] = version
             output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
-            output_dicts_meta.append(output_dict)
-
-unique_output_dicts_meta = {each['primary_key'] : each for each in output_dicts_meta}.values()
-
-for i, output_dict in enumerate(unique_output_dicts_meta):
-    if not use_cryptic_pk: output_dict['primary_key'] = i
-    simplejson.dump(output_dict, foutput_meta)
-    foutput_meta.write('\n')
-
-foutput = open("/scratch/network/alexeys/bills/lexs/bills.json","wa")
-
-output_dicts = list()
-for input in inputs:
-    with open(input,mode="r") as finput:
-        lines = finput.readlines()
-        for line in lines:
-            sid, content = line.split("^^^")
-            try:
-                bla, state, year, docid, docversion_pre = sid.split("/")
-            except: 
-                blah, bla, state, year, docid, docversion_pre = sid.split("/")
-            output_dict = {'primary_key':'', 'content':None}
-            version = docversion_pre.split("_")[1].rstrip(".txt")
-            version = "".join(version.split())
             output_dict['content'] = content.decode("utf-8",errors='replace')
-            output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
-            output_dicts.append(output_dict)
+            output_dicts_combined.append(output_dict)
 
-unique_output_dicts = {each['primary_key'] : each for each in output_dicts}.values()
+unique_output_dicts_combined = {each['primary_key'] : each for each in output_dicts_combined}.values()
 
-for i, output_dict in enumerate(unique_output_dicts):
+for i, output_dict in enumerate(unique_output_dicts_combined):
     if not use_cryptic_pk: output_dict['primary_key'] = i
-    simplejson.dump(output_dict, foutput)
-    foutput.write('\n')
+    simplejson.dump(output_dict, foutput_combined)
+    foutput_combined.write('\n')
