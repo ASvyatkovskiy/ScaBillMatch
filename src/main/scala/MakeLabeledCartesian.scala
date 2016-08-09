@@ -23,8 +23,8 @@ res1: Array[CartesianPair] = Array()
 import com.typesafe.config._
 
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.SparkContext._
-import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.functions._
 
 //import scala.collection.mutable.ListBuffer
@@ -124,7 +124,7 @@ object MakeLabeledCartesian {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit --class MakeLabeledCartesian --master yarn-client --queue production --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit --class MakeLabeledCartesian --master yarn --queue production --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.11/BillAnalysis-assembly-2.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -138,22 +138,25 @@ object MakeLabeledCartesian {
 
   def run(params: Config) {
 
-    val conf = new SparkConf().setAppName("MakeLabeledCartesian")
-      .set("spark.dynamicAllocation.enabled","true")
-      .set("spark.shuffle.service.enabled","true")
-      .set("spark.sql.codegen.wholeStage", "true")
+    val spark = SparkSession.builder().appName("MakeLabeledCartesian")
+      .config("spark.dynamicAllocation.enabled","true")
+      .config("spark.shuffle.service.enabled","true")
+      .config("spark.sql.codegen.wholeStage", "true")
+      .getOrCreate()
 
-    val spark = new SparkContext(conf)
-    val sqlContext = new org.apache.spark.sql.SQLContext(spark)
-    import sqlContext.implicits._
+    import spark.implicits._
 
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
-    val input = sqlContext.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv)
+    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv)
+    input.printSchema()
+    input.show()
+
     val npartitions = (4*input.count()/1000).toInt
 
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
 
+    //sqlContext.udf.register("cleaner_udf", (s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content")))  //.drop("content")
 
@@ -175,15 +178,13 @@ object MakeLabeledCartesian {
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
 
     // Trains a k-means model
-    /*
-     setDefault(
-    k -> 2,
-    maxIter -> 20,
-    initMode -> MLlibKMeans.K_MEANS_PARALLEL,
-    initSteps -> 5,
-    tol -> 1e-4)
-    */
-    val kval: Int = 150
+    // setDefault(
+    //k -> 2,
+    //maxIter -> 20,
+    //initMode -> MLlibKMeans.K_MEANS_PARALLEL,
+    //initSteps -> 5,
+    //tol -> 1e-4)
+    val kval: Int = 120
     val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
     val model = kmeans.fit(rescaled_df)
 
@@ -198,8 +199,10 @@ object MakeLabeledCartesian {
 
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction").as[MetaLabeledDocument]
     bills_meta.printSchema()
+    //FIXME
+    //bills_meta.write.parquet("/user/alexeys/kMeans_test")
  //sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaLabeledDocument].filter(x => x.docversion == vv).cache()
-    var bills_meta_bcast = spark.broadcast(bills_meta.collect())
+    var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
 
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
 
@@ -215,5 +218,5 @@ object MakeLabeledCartesian {
    }
 }
 
-@serializable case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long)
-@serializable case class CartesianPair(pk1: String, pk2: String)
+case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long)
+case class CartesianPair(pk1: String, pk2: String)

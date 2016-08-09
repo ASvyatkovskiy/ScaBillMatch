@@ -15,7 +15,7 @@ import com.typesafe.config._
 
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.SparkContext._
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
 import org.apache.spark.ml.feature.{HashingTF, IDF}
@@ -48,7 +48,7 @@ object BillAnalyzer {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit  --class BillAnalyzer --master yarn-client --queue production --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar\n")
+    println(s"\nExample submit command: spark-submit  --class BillAnalyzer --master yarn-client --queue production --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.11/BillAnalysis-assembly-2.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -70,35 +70,38 @@ object BillAnalyzer {
             len = len + customNPartitions(f)
       }
       //353 GB worked with 7000 partitions
-      val npartitions = (7000.*(len/350000000000.)).toInt
-      npartitions  
+      (7.0*len/350000000.0).toInt
   }
 
   def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
      a ++ b
   }   
 
+  def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
+
+  def appendFeature_udf = udf(appendFeature _)
+
   def run(params: Config) {
 
-    val conf = new SparkConf().setAppName("BillAnalyzer")
-      .set("spark.dynamicAllocation.enabled","true")
-      .set("spark.shuffle.service.enabled","true")
-      .set("spark.sql.codegen.wholeStage", "true")
+    val spark = SparkSession
+      .builder()
+      .appName("MakeLabeledCartesian")
+      .config("spark.dynamicAllocation.enabled","true")
+      .config("spark.shuffle.service.enabled","true")
+      .config("spark.sql.codegen.wholeStage", "true")
+      .getOrCreate()
 
-    val spark = new SparkContext(conf)
-    val sqlContext = new org.apache.spark.sql.SQLContext(spark)
-    import sqlContext.implicits._
-    
+    import spark.implicits._
+ 
     val vv: String = params.getString("billAnalyzer.docVersion") //like "Enacted"
 
-    val jsonSchema = sqlContext.read.json(spark.parallelize(Array("""{"docversion": "str", "docid": "str", "primary_key": "str", "content": "str"}""")))
-    val input = sqlContext.read.format("json").schema(jsonSchema.schema).load(params.getString("billAnalyzer.inputBillsFile")).filter($"docversion" === vv)
+    val jsonSchema = spark.read.json(spark.sparkContext.parallelize(Array("""{"docversion": "str", "docid": "str", "primary_key": "str", "content": "str"}""")))
+    val input = spark.read.format("json").schema(jsonSchema.schema).load(params.getString("billAnalyzer.inputBillsFile")).filter($"docversion" === vv)
     val npartitions = (4*(input.count()/1000)).toInt
 
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
 
-    def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
@@ -114,7 +117,6 @@ object BillAnalyzer {
        val ngram = new NGram().setN(params.getInt("billAnalyzer.nGramGranularity")).setInputCol("filtered").setOutputCol("ngram")
        val ngram_df = ngram.transform(prefeaturized_df)
 
-       def appendFeature_udf = udf(appendFeature _)
        prefeaturized_df = ngram_df.withColumn("combined", appendFeature_udf(col("filtered"),col("ngram"))).drop("filtered").drop("ngram").drop("cleaned")
     } else {
        prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("filtered").alias("combined"))
@@ -135,7 +137,7 @@ object BillAnalyzer {
     //First, run the hashing step here
     val nPartJoin = 2*customNPartitions(new File(params.getString("billAnalyzer.inputPairsFile")))
     println("Running join with "+nPartJoin+" partitions")
-    val cartesian_pairs = spark.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0

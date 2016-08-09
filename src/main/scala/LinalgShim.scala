@@ -28,7 +28,7 @@ object LinalgShim {
    * Convert a Spark vector to a Breeze vector to access
    * vector operations that Spark doesn't provide.
    */
-  def toBreeze(x: Vector): BV[Double] = {
-    x.toBreeze
+  def asBreeze(x: Vector): BV[Double] = {
+    x.asBreeze
   }
 }

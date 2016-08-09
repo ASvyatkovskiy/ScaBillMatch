@@ -42,8 +42,8 @@ private final object ManhattanSimilarity extends SimilarityMeasure {
    * Breeze vector operations
    */
   def compute(v1: SparseVector, v2: SparseVector): Double = {
-    val b1 = LinalgShim.toBreeze(v1)
-    val b2 = LinalgShim.toBreeze(v2)
+    val b1 = LinalgShim.asBreeze(v1)
+    val b2 = LinalgShim.asBreeze(v2)
     100.0/(1+norm(b1 - b2, 1.0))
   }
 }
