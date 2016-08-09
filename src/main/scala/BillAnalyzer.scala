@@ -23,6 +23,8 @@ import org.apache.spark.ml.feature.{RegexTokenizer, Tokenizer}
 import org.apache.spark.ml.feature.NGram
 import org.apache.spark.ml.feature.StopWordsRemover
 
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
+
 //import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
 
 import org.apache.spark.sql.Row
@@ -30,7 +32,7 @@ import org.apache.spark.sql.types._
 
 import scala.collection.mutable.WrappedArray
 
-import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
+//import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
 import java.io._
 
@@ -48,7 +50,7 @@ object BillAnalyzer {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit  --class BillAnalyzer --master yarn-client --queue production --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.11/BillAnalysis-assembly-2.0.jar\n")
+    println(s"\nExample submit command: spark-submit --class BillAnalyzer --master yarn --queue production --num-executors 40 --executor-cores 3 --executor-memory 10g target/scala-2.11/BillAnalysis-assembly-2.0.jar\n")
 
     val t0 = System.nanoTime()
 

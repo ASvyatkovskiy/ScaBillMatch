@@ -184,7 +184,7 @@ object MakeLabeledCartesian {
     //initMode -> MLlibKMeans.K_MEANS_PARALLEL,
     //initSteps -> 5,
     //tol -> 1e-4)
-    val kval: Int = 120
+    val kval: Int = 150
     val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
     val model = kmeans.fit(rescaled_df)
 

@@ -1,7 +1,7 @@
 import breeze.linalg.norm
-import org.apache.spark.mllib.linalg.{ SparseVector, Vectors }
+import org.apache.spark.ml.linalg.{SparseVector, Vectors}
 
-import org.apache.spark.mllib.linalg.LinalgShim
+import org.apache.spark.ml.linalg.LinalgShim
 
 /**
  * This abstract base class provides the interface for
