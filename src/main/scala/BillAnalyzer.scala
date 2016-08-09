@@ -87,7 +87,7 @@ object BillAnalyzer {
 
     val spark = SparkSession
       .builder()
-      .appName("MakeLabeledCartesian")
+      .appName("BillAnalysis")
       .config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
       .config("spark.sql.codegen.wholeStage", "true")
