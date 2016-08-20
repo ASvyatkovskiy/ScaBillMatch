@@ -58,9 +58,16 @@ save(my,"cosine_jaccard_filtered.html")
 
 # Print top similarity matches for this selections
 
+Note, that when we are only interested in top similarity matches, we do not need to carry the bulk of the distribution around. So we apply a filter before sorting step which saves hours of work:
+```scala
+....filter({case ((k1,k2),v) => (v > 70.0)})
+```
+
+Here is the complete workflow:
+
 ```scala
 val data_jaccard = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alexeys/output_10000_jaccard_nFeat100k").cache()
-val filtered_data_jaccard = data_jaccard.filter({case ((k1,k2),v) => ((k1 contains "NJ") || (k2 contains "NJ"))}).cache()
+val filtered_data_jaccard = data_jaccard.filter({case ((k1,k2),v) => ((k1 contains "NJ") || (k2 contains "NJ"))}).filter({case ((k1,k2),v) => (v > 70.0)}).cache()
 
 val sorted_data_jaccard = filtered_data_jaccard.map(x => x.swap).sortByKey(false)
 for (s <- sorted_data_jaccard.take(100)) {
