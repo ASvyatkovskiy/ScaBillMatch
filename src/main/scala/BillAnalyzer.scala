@@ -147,19 +147,19 @@ object BillAnalyzer {
     params.getString("billAnalyzer.measureName") match {
       case "cosine" => {
         similarityMeasure = CosineSimilarity
-        //threshold = ???
+        threshold = 20.0
       }
       case "hamming" => {
         similarityMeasure = HammingSimilarity
-        //threshold = ???
+        threshold = 0.02
       }
       case "manhattan" => {
         similarityMeasure = ManhattanSimilarity
-        //threshold = ???
+        threshold = 0.02
       }
       case "jaccard" => {
         similarityMeasure = JaccardSimilarity
-        //threshold = ???
+        threshold = 20.0
       }
       case other: Any =>
         throw new IllegalArgumentException(
@@ -173,7 +173,7 @@ object BillAnalyzer {
 
     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
         .join(hashed_bills)
-        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => similarityMeasure.compute(v1.toSparse,v2.toSparse)})
+        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => similarityMeasure.compute(v1.toSparse,v2.toSparse)}).filter({case (k,v) => (v > threshold)})
     
     matches.saveAsObjectFile(params.getString("billAnalyzer.outputMainFile"))
 
