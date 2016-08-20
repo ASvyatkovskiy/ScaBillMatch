@@ -24,28 +24,23 @@ import com.typesafe.config._
 
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.SparkContext._
+//import org.apache.spark.SparkContext._
 import org.apache.spark.sql.functions._
 
 //import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
-import org.apache.spark.ml.feature.{HashingTF, IDF}
-import org.apache.spark.ml.feature.{RegexTokenizer, Tokenizer}
-import org.apache.spark.ml.feature.NGram
-import org.apache.spark.ml.feature.StopWordsRemover
+import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
-import scala.collection.mutable.WrappedArray
-
-import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
+//import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
 import java.io._
 
-import org.apache.spark.ml.clustering.KMeans
+import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
 
 
 object MakeLabeledCartesian {
@@ -101,13 +96,6 @@ object MakeLabeledCartesian {
 
   //get type of var utility 
   def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
-
-  def converted(row: scala.collection.Seq[Any]) : Tuple2[String,SparseVector] = {
-    val ret = row.asInstanceOf[WrappedArray[Any]]
-    val first = ret(0).asInstanceOf[String]
-    val second = ret(1).asInstanceOf[Vector]
-    Tuple2(first,second.toSparse)
-  }
 
   def customNPartitions(directory: File) : Int = {
       var len = 0.0
@@ -185,7 +173,8 @@ object MakeLabeledCartesian {
     //initSteps -> 5,
     //tol -> 1e-4)
     val kval: Int = 150
-    val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    //val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    val kmeans = new BisectingKMeans().setK(kval).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
     val model = kmeans.fit(rescaled_df)
 
     var clusters_df = model.transform(rescaled_df)
@@ -199,9 +188,8 @@ object MakeLabeledCartesian {
 
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction").as[MetaLabeledDocument]
     bills_meta.printSchema()
-    //FIXME
     //bills_meta.write.parquet("/user/alexeys/kMeans_test")
- //sqlContext.read.json(params.getString("makeCartesian.inputFile")).as[MetaLabeledDocument].filter(x => x.docversion == vv).cache()
+
     var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
 
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
