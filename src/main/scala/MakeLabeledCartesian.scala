@@ -178,6 +178,8 @@ object MakeLabeledCartesian {
     val model = kmeans.fit(rescaled_df)
 
     var clusters_df = model.transform(rescaled_df)
+    //Setup for splitting by cluster on the step2
+    clusters_df.select("primary_key","docversion","docid","state","year","prediction","content").write.parquet(params.getString("makeCartesian.outputParquetFile"))
 
     val WSSSE = model.computeCost(rescaled_df)
     println("Within Set Sum of Squared Errors = " + WSSSE)
