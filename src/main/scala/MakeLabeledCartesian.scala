@@ -173,8 +173,8 @@ object MakeLabeledCartesian {
     //initSteps -> 5,
     //tol -> 1e-4)
     val kval: Int = 150
-    //val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
-    val kmeans = new BisectingKMeans().setK(kval).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    //val kmeans = new BisectingKMeans().setK(kval).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
     val model = kmeans.fit(rescaled_df)
 
     var clusters_df = model.transform(rescaled_df)
@@ -197,11 +197,15 @@ object MakeLabeledCartesian {
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
 
     //will be array of tuples, but the keys are unique
-    var cartesian_pairs = bills_meta.rdd.repartition(params.getInt("makeCartesian.nPartitions"))
-                          .map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
-                          .filter({case (dd,ll) => (ll.length > 0)})
-                          .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
+    //var cartesian_pairs = bills_meta.rdd.repartition(params.getInt("makeCartesian.nPartitions"))
+    //                      .map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
+    //                      .filter({case (dd,ll) => (ll.length > 0)})
+    //                      .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
+    val cartesian_pairs = bills_meta.rdd.repartition(params.getInt("makeCartesian.nPartitions"))
+                          .mapPartitions(partition => {
+                           val newPartition = partition.map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut"))).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x).toList
+                           newPartition.iterator})
     cartesian_pairs.saveAsObjectFile(params.getString("makeCartesian.outputFile"))
 
     spark.stop()
