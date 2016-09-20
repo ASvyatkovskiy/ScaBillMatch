@@ -201,6 +201,7 @@ object MakeLabeledCartesian {
                           .map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
+
     cartesian_pairs.saveAsObjectFile(params.getString("makeCartesian.outputFile"))
 
     spark.stop()
