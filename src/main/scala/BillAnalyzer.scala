@@ -97,13 +97,7 @@ object BillAnalyzer {
  
     val vv: String = params.getString("billAnalyzer.docVersion") //like "Enacted"
 
-    val jsonSchema = spark.read.json(spark.sparkContext.parallelize(Array("""{"docversion": "str", "docid": "str", "primary_key": "str", "content": "str"}""")))
-    val input = spark.read.format("json").schema(jsonSchema.schema).load(params.getString("billAnalyzer.inputBillsFile")).filter($"docversion" === vv)
-    val npartitions = (4*(input.count()/1000)).toInt
-
-    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
-    bills.explain
-
+    val bills = spark.read.parquet(params.getString("billAnalyzer.inputParquetFile")).coalesce(20).cache()
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
@@ -137,9 +131,10 @@ object BillAnalyzer {
     val hashed_bills = rescaled_df.select("primary_key","pre_features").rdd.map(row => converted(row.toSeq))
 
     //First, run the hashing step here
-    val nPartJoin = 2*customNPartitions(new File(params.getString("billAnalyzer.inputPairsFile")))
-    println("Running join with "+nPartJoin+" partitions")
-    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
+    //val nPartJoin = 2*customNPartitions(new File(params.getString("billAnalyzer.inputPairsFile")))
+    //println("Running join with "+nPartJoin+" partitions")
+    //val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),3000).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
