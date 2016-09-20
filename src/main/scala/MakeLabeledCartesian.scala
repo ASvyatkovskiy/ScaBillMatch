@@ -134,8 +134,24 @@ object MakeLabeledCartesian {
 
     import spark.implicits._
 
+    def compactSelector_udf = udf((s: WrappedArray[String]) => {
+
+         val probe = s(0).toLowerCase()
+
+         val compactPattern1 = "interstate (\\w+)? compact".r
+         val isCompact1 = compactPattern1.findFirstIn(probe).getOrElse("")
+
+         val compactPattern2 = "this act may be cited as the (\\w+)? compact act".r
+         val isCompact2 = compactPattern2.findFirstIn(probe).getOrElse("")
+
+         val compactPattern3 = "implements the (\\w+)? compact".r
+         val isCompact3 = compactPattern3.findFirstIn(probe).getOrElse("")
+
+         isCompact1.isEmpty() || isCompact2.isEmpty() || isCompact3.isEmpty()
+      })
+
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
-    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv)
+    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(compactSelector_udf(col("content")))
     input.printSchema()
     input.show()
 
