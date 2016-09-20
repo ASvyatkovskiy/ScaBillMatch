@@ -134,9 +134,9 @@ object MakeLabeledCartesian {
 
     import spark.implicits._
 
-    def compactSelector_udf = udf((s: WrappedArray[String]) => {
+    def compactSelector_udf = udf((s: String) => {
 
-         val probe = s(0).toLowerCase()
+         val probe = s.toLowerCase()
 
          val compactPattern1 = "interstate (\\w+)? compact".r
          val isCompact1 = compactPattern1.findFirstIn(probe).getOrElse("")
