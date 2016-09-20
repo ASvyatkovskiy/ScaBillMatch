@@ -173,8 +173,8 @@ object MakeLabeledCartesian {
     //initSteps -> 5,
     //tol -> 1e-4)
     val kval: Int = 150
-    //val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
-    val kmeans = new BisectingKMeans().setK(kval).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    //val kmeans = new BisectingKMeans().setK(kval).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
     val model = kmeans.fit(rescaled_df)
 
     var clusters_df = model.transform(rescaled_df)
@@ -201,7 +201,6 @@ object MakeLabeledCartesian {
                           .map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
-
     cartesian_pairs.saveAsObjectFile(params.getString("makeCartesian.outputFile"))
 
     spark.stop()
