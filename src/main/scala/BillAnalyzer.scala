@@ -90,6 +90,7 @@ object BillAnalyzer {
       .appName("BillAnalysis")
       .config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
+      .config("spark.shuffle.memoryFraction","0.5")
       .config("spark.sql.codegen.wholeStage", "true")
       .getOrCreate()
 
