@@ -5,7 +5,6 @@ Following parameters need to be filled in the resources/billAnalyzer.conf file:
     addNGramFeatures: Boolean flag to indicate whether to add n-gram features
     nGramGranularity: granularity of a rolling n-gram
     measureName: Similarity measure used
-    inputBillsFile: Bill input file, one JSON per line
     inputPairsFile: CartesianPairs object input file
     outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
     outputFilteredFile: CartesianPairs passing similarity threshold
@@ -88,7 +87,7 @@ object BillAnalyzer {
     val spark = SparkSession
       .builder()
       .appName("BillAnalysis")
-      .config("spark.dynamicAllocation.enabled","true")
+      //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
       .config("spark.shuffle.memoryFraction","0.5")
       .config("spark.sql.codegen.wholeStage", "true")
@@ -98,7 +97,7 @@ object BillAnalyzer {
  
     val vv: String = params.getString("billAnalyzer.docVersion") //like "Enacted"
 
-    val bills = spark.read.parquet(params.getString("billAnalyzer.inputParquetFile")).coalesce(20).cache()
+    val bills = spark.read.parquet(params.getString("billAnalyzer.inputParquetFile")).coalesce(params.getInt("billAnalyzer.nPartitions")).cache()
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
@@ -135,7 +134,7 @@ object BillAnalyzer {
     //val nPartJoin = 2*customNPartitions(new File(params.getString("billAnalyzer.inputPairsFile")))
     //println("Running join with "+nPartJoin+" partitions")
     //val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),Math.max(200,nPartJoin)).map(pp => (pp.pk1,pp.pk2))
-    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),3000).map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),params.getInt("billAnalyzer.nCPartitions")).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
