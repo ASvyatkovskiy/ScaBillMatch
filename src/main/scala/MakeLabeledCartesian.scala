@@ -127,7 +127,7 @@ object MakeLabeledCartesian {
   def run(params: Config) {
 
     val spark = SparkSession.builder().appName("MakeLabeledCartesian")
-      .config("spark.dynamicAllocation.enabled","true")
+      //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
       .config("spark.sql.codegen.wholeStage", "true")
       .getOrCreate()
@@ -138,16 +138,16 @@ object MakeLabeledCartesian {
 
          val probe = s.toLowerCase()
 
-         val compactPattern1 = "interstate (\\w+)? compact".r
+         val compactPattern1 = "interstate(\\s?\\w*\\s?){0,3}compact".r
          val isCompact1 = compactPattern1.findFirstIn(probe).getOrElse("")
 
-         val compactPattern2 = "this act may be cited as the (\\w+)? compact act".r
+         val compactPattern2 = "this act may be cited as the(\\s?\\w*\\s?){1,3}compact act".r
          val isCompact2 = compactPattern2.findFirstIn(probe).getOrElse("")
 
-         val compactPattern3 = "implements the (\\w+)? compact".r
+         val compactPattern3 = "implements the(\\s?\\w*\\s?){0,3}compact".r
          val isCompact3 = compactPattern3.findFirstIn(probe).getOrElse("")
 
-         isCompact1.isEmpty() || isCompact2.isEmpty() || isCompact3.isEmpty()
+         isCompact1.isEmpty() && isCompact2.isEmpty() && isCompact3.isEmpty()
       })
 
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
@@ -199,21 +199,18 @@ object MakeLabeledCartesian {
 
     val WSSSE = model.computeCost(rescaled_df)
     println("Within Set Sum of Squared Errors = " + WSSSE)
-    //model.explainParams()
+    model.explainParams()
 
     val explained = model.extractParamMap()
     println(explained)
 
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction").as[MetaLabeledDocument]
-    bills_meta.printSchema()
-    //bills_meta.write.parquet("/user/alexeys/kMeans_test")
-
     var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
 
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
 
     //will be array of tuples, but the keys are unique
-    var cartesian_pairs = bills_meta.rdd.repartition(params.getInt("makeCartesian.nPartitions"))
+    var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("makeCartesian.nPartitions"))
                           .map(x => pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
