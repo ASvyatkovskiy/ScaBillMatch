@@ -16,7 +16,7 @@ import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, N
 
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
-
+import org.apache.spark.RangePartitioner
 
 object AggregatorTest3 {
 
@@ -30,8 +30,9 @@ object AggregatorTest3 {
     val spark = SparkSession
       .builder()
       .appName("DatasetAggregatorTest")
-      .config("spark.dynamicAllocation.enabled","true")
+      //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
+      .config("spark.shuffle.memoryFraction","0.5")
       .config("spark.sql.codegen.wholeStage", "true")
       .getOrCreate()
 
@@ -40,8 +41,6 @@ object AggregatorTest3 {
     // create an RDD of tuples with some data
     val bills = spark.read.parquet("/user/alexeys/bills_combined_3/part*").cache()
 
-    println(bills.count())
-    println(bills.rdd.getNumPartitions)
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
 
@@ -66,16 +65,17 @@ object AggregatorTest3 {
     def my_combiner = (p1: ListBuffer[(String,Long,Vector)], p2: ListBuffer[(String,Long,Vector)]) => p1 ++= p2
 
     //mapValues(x => x.combinations(2).filter{case Seq(x,y) => (x._2 != y._2)}.map{case Seq(x,y) => (x._1,y._1,similarityMeasure.compute(x._3.toSparse,y._3.toSparse))}.
-    def mapPartitions2(iter: Iterator[(Long,ListBuffer[(String,Long,Vector)])]): Iterator[(String, String, Double)] = {
-        var result = List.empty[(String, String, Double)]
-        if (iter.hasNext) {
-           val x: ListBuffer[(String,Long,Vector)] = iter.next._2
-           result = x.combinations(2).filter{case Seq(x,y) => (x._2 != y._2)}.map{case Seq(x,y) => (x._1,y._1,similarityMeasure.compute(x._3.toSparse,y._3.toSparse))}.filter{case (x,y,z) => (z > 70.0)}.toList //.toIndexedSeq 
-        }
-        result.toIterator
-    }
+    //def mapPartitions2(iter: Iterator[(Long,ListBuffer[(String,Long,Vector)])]): Iterator[(String, String, Double)] = {
+    //    var result = List.empty[(String, String, Double)]
+    //    if (iter.hasNext) {
+    //       val x: ListBuffer[(String,Long,Vector)] = iter.next._2
+    //       result = x.combinations(2).filter{case Seq(x,y) => (x._2 != y._2)}.map{case Seq(x,y) => (x._1,y._1,similarityMeasure.compute(x._3.toSparse,y._3.toSparse))}.filter{case (x,y,z) => (z > 70.0)}.toList //.toIndexedSeq 
+    //    }
+    //    result.toIterator
+    //}
 
-    val results = ds.aggregateByKey(zero)(my_grouper,my_combiner).mapValues(x => x.combinations(2).filter{case Seq(x,y) => (x._2 != y._2)}.map{case Seq(x,y) => (x._1,y._1,similarityMeasure.compute(x._3.toSparse,y._3.toSparse))}.filter{case (x,y,z) => (z > 70.0)}.toIndexedSeq).filter(x => (x._2.length != 0)).flatMap(x=>x._2).toDF("pk1","pk2","similarity")
+    val rangeP = new RangePartitioner(150,ds) 
+    val results = ds.partitionBy(rangeP).aggregateByKey(zero)(my_grouper,my_combiner).mapValues(x => x.combinations(2).filter{case Seq(x,y) => (x._2 != y._2)}.map{case Seq(x,y) => (x._1,y._1,similarityMeasure.compute(x._3.toSparse,y._3.toSparse))}.filter{case (x,y,z) => (z > 70.0)}.toIndexedSeq).filter(x => (x._2.length != 0)).flatMap(x=>x._2).toDF("pk1","pk2","similarity")
     //val results = ds.aggregateByKey(zero)(my_grouper,my_combiner).mapPartitions(mapPartitions2).toDF("pk1","pk2","similarity")
 
     //results.printSchema()
@@ -84,7 +84,7 @@ object AggregatorTest3 {
     //for (d <- results.take(10)) {
     //    println(d)
     //}
-    results.write.parquet("/user/alexeys/new_3_state_test") 
+    results.write.parquet("/user/alexeys/TEST") 
 
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
@@ -92,3 +92,4 @@ object AggregatorTest3 {
   }
 
 } 
+//case class AggDocument(primary_key: String, prediction: Long, state: Long, features: Vector)
