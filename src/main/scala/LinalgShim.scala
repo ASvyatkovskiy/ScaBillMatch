@@ -1,16 +1,7 @@
-package org.apache.spark.mllib.linalg
+package org.apache.spark.ml.linalg
 
 import breeze.linalg.{ SparseVector => BSV, Vector => BV }
 
-/**
- * This shim reaches into Spark's private linear algebra
- * code, in order to take advantage of optimized dot products.
- * While the dot product implementation in question is part of
- * MLlib's BLAS module, BLAS itself only supports dot products
- * between dense vectors, and MLlib implements sparse vector
- * dot products. Using a shim here avoids copy/pasting that
- * implementation.
- */
 object LinalgShim {
 
   /**
@@ -28,7 +19,7 @@ object LinalgShim {
    * Convert a Spark vector to a Breeze vector to access
    * vector operations that Spark doesn't provide.
    */
-  def toBreeze(x: Vector): BV[Double] = {
-    x.toBreeze
+  def asBreeze(x: Vector): BV[Double] = {
+    x.asBreeze
   }
 }
