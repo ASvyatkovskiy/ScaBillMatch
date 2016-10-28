@@ -1,5 +1,6 @@
 /*
 Application: MakeLabeledCartesian, produce all the pairs of primary keys of the documents satisfying a predicate.
+Perform document bucketing using k-means clustering.
 
 Following parameters need to be filled in the resources/makeCartesian.conf file:
 	docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted...
@@ -14,7 +15,7 @@ Following parameters need to be filled in the resources/makeCartesian.conf file:
 
 Example to explore output in spark-shell:
 $ spark-shell --jars target/scala-2.10/BillAnalysis-assembly-1.0.jar 
-scala> val mydata = sc.objectFile[CartesianPair]("/user/alexeys/valid_pairs")
+scala> val mydata = sc.objectFile[CartesianPair]("/user/path/to/files")
 mydata: org.apache.spark.rdd.RDD[CartesianPair] = MapPartitionsRDD[3] at objectFile at <console>:27
 
 scala> mydata.take(5)
@@ -22,25 +23,18 @@ res1: Array[CartesianPair] = Array()
 */
 import com.typesafe.config._
 
-import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.sql.SparkSession
-//import org.apache.spark.SparkContext._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.types._
 
-//import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
-
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types._
-
-//import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
+import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
 
 import java.io._
-
-import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
 
 
 object MakeLabeledCartesian {
@@ -129,7 +123,9 @@ object MakeLabeledCartesian {
     val spark = SparkSession.builder().appName("MakeLabeledCartesian")
       //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
+      .config("spark.shuffle.memoryFraction","0.5")
       .config("spark.sql.codegen.wholeStage", "true")
+      .config("spark.driver.maxResultSize", "10g")
       .getOrCreate()
 
     import spark.implicits._
@@ -138,16 +134,13 @@ object MakeLabeledCartesian {
 
          val probe = s.toLowerCase()
 
-         val compactPattern1 = "interstate(\\s?\\w*\\s?){0,3}compact".r
-         val isCompact1 = compactPattern1.findFirstIn(probe).getOrElse("")
+         val compactPattern = "compact".r
+         val isCompact = compactPattern.findFirstIn(probe).getOrElse("")
 
-         val compactPattern2 = "this act may be cited as the(\\s?\\w*\\s?){1,3}compact act".r
-         val isCompact2 = compactPattern2.findFirstIn(probe).getOrElse("")
+         val uniformPattern = "uniform".r
+         val isUniform = uniformPattern.findFirstIn(probe).getOrElse("")
 
-         val compactPattern3 = "implements the(\\s?\\w*\\s?){0,3}compact".r
-         val isCompact3 = compactPattern3.findFirstIn(probe).getOrElse("")
-
-         isCompact1.isEmpty() && isCompact2.isEmpty() && isCompact3.isEmpty()
+         (isCompact.isEmpty() && isUniform.isEmpty())
       })
 
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
@@ -188,19 +181,17 @@ object MakeLabeledCartesian {
     //initMode -> MLlibKMeans.K_MEANS_PARALLEL,
     //initSteps -> 5,
     //tol -> 1e-4)
-    val kval: Int = 150
-    val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
-    //val kmeans = new BisectingKMeans().setK(kval).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    val kmeans = new KMeans().setK(params.getInt("makeCartesian.kval")).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+    //val kmeans = new BisectingKMeans().setK(params.getInt("makeCartesian.kval")).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
     val model = kmeans.fit(rescaled_df)
-
     var clusters_df = model.transform(rescaled_df)
+
     //Setup for splitting by cluster on the step2
     clusters_df.select("primary_key","docversion","docid","state","year","prediction","content").write.parquet(params.getString("makeCartesian.outputParquetFile"))
 
     val WSSSE = model.computeCost(rescaled_df)
     println("Within Set Sum of Squared Errors = " + WSSSE)
     model.explainParams()
-
     val explained = model.extractParamMap()
     println(explained)
 
