@@ -34,10 +34,62 @@ import scala.collection.mutable.WrappedArray
 import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
 import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
 
-import java.io._
+import org.apache.spark.mllib.linalg.{Matrix, Matrices}
+import org.apache.spark.mllib.linalg.SingularValueDecomposition
+import org.apache.spark.mllib.linalg.distributed.RowMatrix
 
+//we have to deal with this nonsense for now
+import org.apache.spark.mllib.linalg.{
+  Vector => OldVector, Vectors => OldVectors, VectorUDT => OldVectorUDT}
+
+import org.apache.spark.ml.linalg.{
+   Vector => NewVector,
+   DenseVector => NewDenseVector,
+   SparseVector => NewSparseVector
+}
+
+import java.io._
+import org.apache.spark.sql.functions.monotonicallyIncreasingId
 
 object MakeLabeledCartesian {
+
+  //FIXME think about more genmeral way to convert dataframes to RDD and back
+  def converted2(row: scala.collection.Seq[Any]) : NewVector = {
+    val ret = row.asInstanceOf[WrappedArray[Any]]
+    ret(0).asInstanceOf[NewVector]
+  }
+
+  /**
+   * Finds the product of a distributed matrix and a diagonal matrix represented by a vector.
+   */
+  def multiplyByDiagonalMatrix(mat: RowMatrix, diag: OldVector): RowMatrix = {
+    val sArr = diag.toArray
+    new RowMatrix(mat.rows.map(vec => {
+      val vecArr = vec.toArray
+      val newArr = (0 until vec.size).toArray.map(i => vecArr(i) * sArr(i))
+      OldVectors.dense(newArr)
+    }))
+  }
+
+  def customMultiply(sigma: OldVector, vt: Matrix, numConcepts: Int) : Matrix = {
+      var vt_arr = vt.toArray
+      var colIndex = 0
+      var combinedIndex = 0
+      for (i <- 0 to numConcepts) {
+          combinedIndex = i*vt.numRows+colIndex
+          vt_arr(combinedIndex) *= sigma(colIndex)
+          colIndex += 1
+      } 
+      Matrices.dense(vt.numRows,vt.numCols,vt_arr)
+  }
+
+  //def customMultiply(u: RowMatrix, svt: Matrix) = {  
+  //}
+
+  def toOld(v: NewVector): OldVector = v match {
+    case sv: NewSparseVector => OldVectors.sparse(sv.size, sv.indices, sv.values)
+    case dv: NewDenseVector => OldVectors.dense(dv.values)
+  }
 
   def pairup (document: MetaLabeledDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaLabeledDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int], onlyInOut: Boolean) : (MetaLabeledDocument, Array[CartesianPair]) = {
 
@@ -90,6 +142,11 @@ object MakeLabeledCartesian {
 
   //get type of var utility 
   def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
+
+  //Calculate submatrix containing nColsToKeep of inital matrix A. This is used for truncating the V.T matrix in SVD 
+  def truncatedMatrix(a: Matrix, nColsToKeep: Int): Matrix = {
+      Matrices.dense(a.numRows,nColsToKeep,a.toArray.slice(0,a.numRows*nColsToKeep))
+  }
 
   def customNPartitions(directory: File) : Int = {
       var len = 0.0
@@ -174,6 +231,29 @@ object MakeLabeledCartesian {
     var idfModel = idf.fit(featurized_df)
     val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
 
+    //Apply low-rank matrix factorization via SVD approach, truncate to reduce the dimensionality
+    val dataPart2 = rescaled_df.select("primary_key","docversion","docid","state","year","content").withColumn("index",monotonically_increasing_id).cache()
+
+    val dataRDD = rescaled_df.select("features").rdd.map(row => converted2(row.toSeq)).map(x => toOld(x)).cache()
+    val mat: RowMatrix = new RowMatrix(dataRDD) //that assumes RDD of Vectors
+
+    // Compute the top 5 singular values and corresponding singular vectors.
+    val numConcepts = 5
+    val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(numConcepts, computeU = true)
+    val U: RowMatrix = svd.U  // The U factor is a RowMatrix.
+    val s: OldVector = svd.s  // The singular values are stored in a local dense vector.
+    val VT: Matrix = svd.V.transpose  // The V factor is a local dense matrix.
+    //println("Singular values: " + svd.s)
+    //println(V.numRows,V.numCols)
+    var us: RowMatrix = multiplyByDiagonalMatrix(U,s)
+    var reconstructed = us.multiply(truncatedMatrix(VT,numConcepts)).rows.map(x => Row(x))
+    val reco_schema = StructType(List(StructField("features", new OldVectorUDT(), true)))
+    val reco_df = spark.createDataFrame(reconstructed,reco_schema)
+    reco_df.show()
+    reco_df.printSchema
+    println(reco_df.count())
+    println(dataPart2.count())
+
     // Trains a k-means model
     // setDefault(
     //k -> 2,
@@ -186,14 +266,21 @@ object MakeLabeledCartesian {
     val model = kmeans.fit(rescaled_df)
     var clusters_df = model.transform(rescaled_df)
 
-    //Setup for splitting by cluster on the step2
-    clusters_df.select("primary_key","docversion","docid","state","year","prediction","content").write.parquet(params.getString("makeCartesian.outputParquetFile"))
-
     val WSSSE = model.computeCost(rescaled_df)
     println("Within Set Sum of Squared Errors = " + WSSSE)
     model.explainParams()
     val explained = model.extractParamMap()
     println(explained)
+
+    //Setup for splitting by cluster on the step2
+    val dataPart1 = clusters_df.select("prediction").withColumn("index",monotonicallyIncreasingId).cache()
+    clusters_df = dataPart1.join(dataPart2, dataPart2("index") === dataPart1("index"))
+    println(dataPart1.count())
+    println(clusters_df.count())
+    clusters_df.printSchema()
+    clusters_df.show()
+
+    //clusters_df.select("primary_key","docversion","docid","state","year","prediction","content").write.parquet(params.getString("makeCartesian.outputParquetFile"))
 
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction").as[MetaLabeledDocument]
     var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
