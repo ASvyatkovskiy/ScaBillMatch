@@ -71,21 +71,6 @@ object MakeLabeledCartesian {
     }))
   }
 
-  def customMultiply(sigma: OldVector, vt: Matrix, numConcepts: Int) : Matrix = {
-      var vt_arr = vt.toArray
-      var colIndex = 0
-      var combinedIndex = 0
-      for (i <- 0 to numConcepts) {
-          combinedIndex = i*vt.numRows+colIndex
-          vt_arr(combinedIndex) *= sigma(colIndex)
-          colIndex += 1
-      } 
-      Matrices.dense(vt.numRows,vt.numCols,vt_arr)
-  }
-
-  //def customMultiply(u: RowMatrix, svt: Matrix) = {  
-  //}
-
   def toOld(v: NewVector): OldVector = v match {
     case sv: NewSparseVector => OldVectors.sparse(sv.size, sv.indices, sv.values)
     case dv: NewDenseVector => OldVectors.dense(dv.values)
