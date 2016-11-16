@@ -13,7 +13,7 @@ import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
 
 import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 import org.apache.spark.mllib.linalg.SingularValueDecomposition
-import org.apache.spark.mllib.linalg.distributed.RowMatrix
+import org.apache.spark.mllib.linalg.distributed.{RowMatrix,CoordinateMatrix}
 
 //we have to deal with this nonsense for now
 import org.apache.spark.mllib.linalg.{
@@ -33,7 +33,6 @@ import org.apache.spark.ml.linalg.{
 }
 
 import java.io._
-//import org.apache.spark.sql.functions.monotonicallyIncreasingId
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
 
@@ -131,14 +130,11 @@ object Utils {
       (7*len/350000000).toInt
    }
 
-   def DIMSUMSuite(mat: RowMatrix, threshold: Int) : RowMatrix = ??? 
- 
-   //{ 
-   // Compute similar columns with estimation using DIMSUM
-   // val approx = mat.columnSimilarities(threshold)
-   // val approxEntries = approx.entries.map { case MatrixEntry(i, j, v) => ((i, j), v) }
-   // approxEntries 
-   //}
+   def DIMSUMSuite(mat: RowMatrix, threshold: Double) : CoordinateMatrix = { 
+     //Compute similar columns with estimation using DIMSUM
+     val approx = mat.columnSimilarities(threshold)
+     approx
+   }
 
    def KMeansSuite(rescaled_df: DataFrame, kval: Int) : DataFrame = {
       // Trains a k-means model
@@ -150,6 +146,7 @@ object Utils {
       //tol -> 1e-4)
       val kmeans = new KMeans().setK(kval).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
       //val kmeans = new BisectingKMeans().setK(params.getInt("makeCartesian.kval")).setSeed(1).setMaxIter(40).setFeaturesCol("features").setPredictionCol("prediction")
+
       val model = kmeans.fit(rescaled_df)
       var clusters_df = model.transform(rescaled_df)
 
@@ -175,7 +172,33 @@ object Utils {
     spark.createDataFrame(reconstructed,reco_schema)
   }
 
+
+  def transposeRowMatrix(m: RowMatrix): RowMatrix = {
+     val transposedRowsRDD = m.rows.zipWithIndex.map{case (row, rowIndex) => rowToTransposedTriplet(row, rowIndex)}
+       .flatMap(x => x) // now we have triplets (newRowIndex, (newColIndex, value))
+       .groupByKey
+       .sortByKey().map(_._2) // sort rows and remove row indexes
+       .map(buildRow) // restore order of elements in each row and remove column indexes
+     new RowMatrix(transposedRowsRDD)
+   }
+
+
+  def rowToTransposedTriplet(row: OldVector, rowIndex: Long): Array[(Long, (Long, Double))] = {
+     val indexedRow = row.toArray.zipWithIndex
+     indexedRow.map{case (value, colIndex) => (colIndex.toLong, (rowIndex, value))}
+   }
+
+  def buildRow(rowWithIndexes: Iterable[(Long, Double)]): OldVector = {
+     val resArr = new Array[Double](rowWithIndexes.size)
+     rowWithIndexes.foreach{case (index, value) =>
+         resArr(index.toInt) = value
+     }
+     OldVectors.dense(resArr)
+   } 
+
+
   def LSA2(spark: SparkSession, dataRDD: RDD[OldVector], numConcepts: Int, keepConcepts: Int) : RowMatrix = {
+    //same as above, but prepare output in the format DIMSUM expects it (transposed RowMatrix)
     val mat: RowMatrix = new RowMatrix(dataRDD) //that assumes RDD of Vectors
     val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(numConcepts, computeU = true)
     val U: RowMatrix = svd.U  // The U factor is a RowMatrix.
@@ -183,13 +206,7 @@ object Utils {
     var VT: Matrix = svd.V.transpose  // The V factor is a local dense matrix.
     val us: RowMatrix = multiplyByDiagonalMatrix(U,s)
     val reconstructed = us.multiply(truncatedMatrix(VT,keepConcepts))
-
-    /*val transposed = reconstructed.rows.zipWithIndex.map{ 
-       case (rvect, i) => rvect.zipWithIndex.map{ case (ax, j) => (j,(i,ax))}.groupByKey.sortBy{ case (i, ax) => i }.foldByKey(new OldDenseVector(reconstructed.numRows())) { 
-       case (dv, (ix,ax))  => dv(ix) = ax 
-      }
-    }*/
-    reconstructed
+    transposeRowMatrix(reconstructed)
   }
 
   def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
