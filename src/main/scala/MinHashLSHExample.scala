@@ -2,8 +2,6 @@ package org.apache.spark.ml.feature
 
 import com.typesafe.config._
 
-//import org.apache.spark.ml.feature.MinHashLSH
-
 import org.apache.spark.sql.Dataset
 
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
@@ -46,12 +44,6 @@ object MinHashLSHExample {
     // Compute actual
     val actual = model.approxSimilarityJoin(datasetA, datasetB, threshold)
 
-    //SchemaUtils.checkColumnType(actual.schema, "distCol", DataTypes.DoubleType)
-    //assert(actual.schema.apply("datasetA").dataType
-    //  .sameType(model.transformSchema(datasetA.schema)))
-    //assert(actual.schema.apply("datasetB").dataType
-    //  .sameType(model.transformSchema(datasetB.schema)))
-
     // Compute precision and recall
     val correctCount = actual.filter(col("distCol") < threshold).count().toDouble
     (correctCount / actual.count(), correctCount / expected.count())
@@ -71,6 +63,7 @@ object MinHashLSHExample {
     actual.show()
     actual.printSchema()
     actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).write.parquet("/user/alexeys/test_similarity_join")
+    //actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).show() 
   }
 
 
@@ -87,10 +80,12 @@ object MinHashLSHExample {
 
     import spark.implicits._
 
+    val t0 = System.nanoTime()
+
     val params = ConfigFactory.load("makeCartesian")
 
     /*
-    //Artificial data
+    //Artificial toy data
     val data1 = {
       for (i <- 0 until 20) yield Vectors.sparse(100, (5 * i until 5 * i + 5).map((_, 1.0)))
     }
@@ -103,11 +98,9 @@ object MinHashLSHExample {
     */
 
     //Test with actual text data
-
     def compactSelector_udf = udf((s: String) => {
 
        val probe = s.toLowerCase()
-
        val compactPattern = "compact".r
        val isCompact = compactPattern.findFirstIn(probe).getOrElse("")
 
@@ -120,8 +113,8 @@ object MinHashLSHExample {
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
     val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(compactSelector_udf(col("content")))
 
-    val npartitions = (4*input.count()/1000).toInt
-    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
+    //val npartitions = (4*input.count()/1000).toInt
+    val bills = input.repartition(400,col("primary_key"))  //Math.max(npartitions,200),col("primary_key")) //,col("content"))
     bills.explain
 
     val nGramGranularity = params.getInt("makeCartesian.nGramGranularity")
@@ -132,23 +125,20 @@ object MinHashLSHExample {
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
-    var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
+    val tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
     val tokenized_df = tokenizer.transform(cleaned_df)
 
     //remove stopwords 
-    var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
-    var prefeaturized_df = remover.transform(tokenized_df).select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("filtered"))
+    val remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
+    val prefeaturized_df = remover.transform(tokenized_df).select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("filtered"))
 
     val ngram = new NGram().setN(nGramGranularity).setInputCol("filtered").setOutputCol("ngram")
     val ngram_df = ngram.transform(prefeaturized_df)
 
     //hashing
-    var hashingTF = new HashingTF().setInputCol("ngram").setOutputCol("keys").setNumFeatures(numTextFeatures)
+    val hashingTF = new HashingTF().setInputCol("ngram").setOutputCol("keys").setNumFeatures(numTextFeatures)
     val featurized_df = hashingTF.transform(ngram_df).select("keys","primary_key","state")
 
-    ///end 
-    //val mh = new MinHashLSH().setNumHashTables(20)
-    //val mh = new MinHash().setOutputDim(20)
     val mh = new MinHashLSH().setNumHashTables(20)
       .setInputCol("keys")
       .setOutputCol("values")
@@ -157,11 +147,16 @@ object MinHashLSHExample {
     //val (precision, recall) = calculateApproxSimilarityJoin(mh, df1, df2, 0.5)
     //assert(precision == 1.0)
     //assert(recall >= 0.7)
-    val part1 = featurized_df.filter(col("state") === 29).cache()
+    val part1 = featurized_df.filter(col("state") === 29) //.coalesce(200).cache()
     println(part1.count())
-    val part2 = featurized_df.filter(col("state") === 5).cache()
+    part1.explain()
+    val part2 = featurized_df.filter(col("state") === 5) //.coalesce(200).cache()
     println(part2.count())
+    part2.explain()
     calculateApproxSimilarityJoin2(mh,part1,part2,0.1)
+
+    val t1 = System.nanoTime()
+    println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
  
     spark.stop()
   }
