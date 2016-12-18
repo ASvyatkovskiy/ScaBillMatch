@@ -71,8 +71,6 @@ object BillAnalyzer {
 
     import spark.implicits._
  
-    val vv: String = params.getString("billAnalyzer.docVersion") //like "Enacted"
-
     val bills = spark.read.parquet(params.getString("billAnalyzer.inputParquetFile")).coalesce(params.getInt("billAnalyzer.nPartitions")).cache()
     
     val hashed_bills = bills.select("primary_key","features").rdd.map(row => converted(row.toSeq)).cache()
