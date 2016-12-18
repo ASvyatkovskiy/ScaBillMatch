@@ -80,7 +80,7 @@ object DIMSUM {
     val dataRDD = rescaled_df.select("features").rdd.map(row => Utils.converted2(row.toSeq)).map(x => Utils.toOld(x)).cache()
 
     val numConcepts = params.getInt("makeCartesian.numConcepts")
-    val reconstructedT: RowMatrix = Utils.LSA2(spark,dataRDD,numConcepts,2*numConcepts)
+    val reconstructedT: RowMatrix = Utils.LSAmatrix(spark,dataRDD,numConcepts,2*numConcepts)
     //val transposed = Utils.transposeRowMatrix(mat)
     val approx = Utils.DIMSUMSuite(reconstructedT,1.0)
 
