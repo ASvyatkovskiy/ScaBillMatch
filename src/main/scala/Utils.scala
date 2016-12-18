@@ -197,7 +197,7 @@ object Utils {
    } 
 
 
-  def LSA2(spark: SparkSession, dataRDD: RDD[OldVector], numConcepts: Int, keepConcepts: Int) : RowMatrix = {
+  def LSAmatrix(spark: SparkSession, dataRDD: RDD[OldVector], numConcepts: Int, keepConcepts: Int) : RowMatrix = {
     //same as above, but prepare output in the format DIMSUM expects it (transposed RowMatrix)
     val mat: RowMatrix = new RowMatrix(dataRDD) //that assumes RDD of Vectors
     val svd: SingularValueDecomposition[RowMatrix, Matrix] = mat.computeSVD(numConcepts, computeU = true)
