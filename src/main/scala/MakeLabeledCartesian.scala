@@ -97,7 +97,7 @@ object MakeLabeledCartesian {
     val spark = SparkSession.builder().appName("MakeLabeledCartesian")
       //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
-      .config("spark.shuffle.memoryFraction","0.5")
+      .config("spark.shuffle.memoryFraction","0.6")
       .config("spark.sql.codegen.wholeStage", "true")
       .config("spark.driver.maxResultSize", "10g")
       .getOrCreate()
@@ -105,6 +105,12 @@ object MakeLabeledCartesian {
     import spark.implicits._
 
     val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
+    val nGramGranularity = params.getInt("makeCartesian.nGramGranularity")
+    val addNGramFeatures = params.getBoolean("makeCartesian.addNGramFeatures")
+    val numTextFeatures = params.getInt("makeCartesian.numTextFeatures")
+    val useLSA = params.getBoolean("makeCartesian.useLSA")
+    val kval = params.getInt("makeCartesian.kval")
+
     val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(compactSelector_udf(col("content")))
     input.printSchema()
     input.show()
@@ -113,11 +119,6 @@ object MakeLabeledCartesian {
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
 
-    val nGramGranularity = params.getInt("makeCartesian.nGramGranularity")
-    val addNGramFeatures = params.getBoolean("makeCartesian.addNGramFeatures")
-    val numTextFeatures = params.getInt("makeCartesian.numTextFeatures")
-    val useLSA = params.getBoolean("makeCartesian.useLSA")
-    val kval = params.getInt("makeCartesian.kval")
     var rescaled_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity)
     rescaled_df = rescaled_df.cache()
 
@@ -134,7 +135,7 @@ object MakeLabeledCartesian {
         // Compute the top 5 singular values and corresponding singular vectors.
         //320 concepts worked perfectly for 10 states
         val numConcepts = params.getInt("makeCartesian.numConcepts")
-        rescaled_df = Utils.LSA(spark,dataRDD,numConcepts,2*numConcepts)
+        rescaled_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts)
         rescaled_df.show()
         rescaled_df.printSchema
         //assert(dataPart2.count() == rescaled_df.count())
