@@ -58,6 +58,28 @@ object AnalysisUtils {
     }
   } 
 
+  def sampleNRandom(spark: SparkSession, raw_input_filename: String, processed_input_filename: String, numRows: Int, isAscending: Boolean, threshold: Double) : DataFrame = {
+    import spark.implicits._
+
+    var raw_bills = spark.read.json(raw_input_filename).filter(col("docversion") === "Introduced")
+    raw_bills = raw_bills.withColumn("content",Utils.cleaner_udf(col("content")))
+    val processed_data = spark.sparkContext.objectFile[Tuple2[Tuple2[String,String],Double]](processed_input_filename).map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").cache()
+    var sorted = processed_data.filter(processed_data("similarity") >= threshold)
+    if (isAscending) {
+       sorted = processed_data.filter(processed_data("similarity") <= threshold)
+    }
+    println(sorted.count())
+    val j1 = sorted.join(raw_bills.withColumnRenamed("content","content1"),$"pk1" === $"primary_key").select("pk1","pk2","content1","similarity")
+    val j2 = j1.join(raw_bills.withColumnRenamed("content","content2"),$"pk2" === $"primary_key").select("pk1","pk2","content1","content2","similarity")
+
+    val fraction: Double = numRows.toDouble/sorted.count()
+    println(fraction)
+    if (isAscending) {
+      j2.sample(false,fraction).sort(asc("similarity"))
+    } else {
+      j2.sample(false,fraction).sort(desc("similarity"))
+    }
+  }
 
   def cleanSubsample(spark: SparkSession, df: DataFrame) : DataFrame = {
 
