@@ -11,7 +11,21 @@ import scala.collection.mutable.WrappedArray
 import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 import org.apache.spark.mllib.linalg.distributed.{MatrixEntry,RowMatrix}
 
+import org.apache.spark.mllib.linalg.{
+  Vector => OldVector,
+  Vectors => OldVectors,
+  SparseVector => OldSparseVector,
+  DenseVector => OldDenseVector,
+  VectorUDT => OldVectorUDT}
+
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
+
+import org.apache.spark.ml.linalg.{
+   Vector => NewVector,
+   Vectors => NewVectors,
+   DenseVector => NewDenseVector,
+   SparseVector => NewSparseVector
+}
 
 import java.io._
 import org.apache.spark.rdd.RDD
@@ -77,7 +91,8 @@ object DIMSUM {
     val useLSA = params.getBoolean("makeCartesian.useLSA")
     val kval = params.getInt("makeCartesian.kval")
     var rescaled_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity)
-    val dataRDD = rescaled_df.select("features").rdd.map(row => Utils.converted2(row.toSeq)).map(x => Utils.toOld(x)).cache()
+    val dataRDD = rescaled_df.select("features").rdd.map {
+          case Row(v: NewVector) => OldVectors.fromML(v)}.cache()
 
     val numConcepts = params.getInt("makeCartesian.numConcepts")
     val reconstructedT: RowMatrix = Utils.LSAmatrix(spark,dataRDD,numConcepts,2*numConcepts)
