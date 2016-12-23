@@ -254,7 +254,7 @@ object Utils {
     (first,second)
   }
 
-  def twoSidedJoin(cartesian_pairs: RDD, hashed_bills: RDD): RDD = {
+  def twoSidedJoin(cartesian_pairs: RDD[(String,String)], hashed_bills: RDD[(String,NewSparseVector)]): RDD[((String,String),(NewSparseVector,NewSparseVector))] = {
      val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
         .join(hashed_bills)
         .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
