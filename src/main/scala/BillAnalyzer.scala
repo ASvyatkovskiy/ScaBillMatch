@@ -14,21 +14,12 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
-//import org.apache.spark.ml.feature.{HashingTF, IDF}
-//import org.apache.spark.ml.feature.{RegexTokenizer, Tokenizer}
-//import org.apache.spark.ml.feature.NGram
-//import org.apache.spark.ml.feature.StopWordsRemover
-
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
-
-//import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.WrappedArray
-
-//import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
 import java.io._
 
@@ -103,14 +94,8 @@ object BillAnalyzer {
         )
     }
 
-    val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
-        .join(hashed_bills)
-        .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
-
-    val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
-        .join(hashed_bills)
-        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))}).mapValues({case (v1,v2) => similarityMeasure.compute(v1,v2)}).filter({case (k,v) => (v > threshold)})
-    
+    val firstjoin = Utils.twoSidedJoin(cartesian_pairs,hashed_bills)
+    val matches = firstjoin.mapValues({case (v1,v2) => similarityMeasure.compute(v1,v2)}).filter({case (k,v) => (v > threshold)})
     matches.saveAsObjectFile(params.getString("billAnalyzer.outputMainFile"))
 
     spark.stop()
