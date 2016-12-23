@@ -31,30 +31,24 @@ import org.apache.spark.sql.types._
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
-//import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
-//import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
-//import org.apache.spark.mllib.clustering.KMeans
-
 import org.apache.spark.mllib.linalg.{Matrix, Matrices}
-//import org.apache.spark.mllib.linalg.SingularValueDecomposition
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
 
-//we have to deal with this nonsense for now
-//import org.apache.spark.mllib.linalg.{
-//  Vector => OldVector, 
-//  Vectors => OldVectors, 
-//  SparseVector => OldSparseVector,
-//  DenseVector => OldDenseVector,
-//  VectorUDT => OldVectorUDT}
+import org.apache.spark.mllib.linalg.{
+  Vector => OldVector, 
+  Vectors => OldVectors, 
+  SparseVector => OldSparseVector,
+  DenseVector => OldDenseVector,
+  VectorUDT => OldVectorUDT}
 
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 
-//import org.apache.spark.ml.linalg.{
-//   Vector => NewVector,
-//   Vectors => NewVectors,
-//   DenseVector => NewDenseVector,
-//   SparseVector => NewSparseVector
-//}
+import org.apache.spark.ml.linalg.{
+   Vector => NewVector,
+   Vectors => NewVectors,
+   DenseVector => NewDenseVector,
+   SparseVector => NewSparseVector
+}
 
 import java.io._
 //import org.apache.spark.sql.functions.monotonicallyIncreasingId
@@ -127,10 +121,12 @@ object MakeLabeledCartesian {
 
     if (useLSA) {
         //Apply low-rank matrix factorization via SVD approach, truncate to reduce the dimensionality
-        val dataPart2 = rescaled_df.select("primary_key","docversion","docid","state","year").rdd.map(row => Utils.converted3(row.toSeq)).zipWithIndex().map(x => (x._1._1,x._1._2,x._1._3,x._1._4,x._1._5,x._2)).toDF("primary_key","docversion","docid","state","year","id")
-        //val dataPart2 = rescaled_df.select("primary_key","docversion","docid","state","year").withColumn("id",monotonically_increasing_id)
 
-        val dataRDD = rescaled_df.select("features").rdd.map(row => Utils.converted2(row.toSeq)).map(x => Utils.toOld(x)).cache()
+        val dataPart2 = rescaled_df.select("primary_key","docversion","docid","state","year").as[(String,String,String,Long,Long)].rdd.zipWithIndex().map(x => (x._1._1,x._1._2,x._1._3,x._1._4,x._1._5,x._2)).toDF("primary_key","docversion","docid","state","year","id")
+
+        val dataRDD = rescaled_df.select("features").rdd.map {
+              case Row(v: NewVector) => OldVectors.fromML(v)}.cache()
+        //.as[org.apache.spark.ml.linalg.Vector].rdd.map(x => Utils.toOld(x)).cache()
 
         // Compute the top 5 singular values and corresponding singular vectors.
         //320 concepts worked perfectly for 10 states
@@ -143,7 +139,7 @@ object MakeLabeledCartesian {
         clusters_df = Utils.KMeansSuite(rescaled_df,kval)
 
         //Setup for splitting by cluster on the step2
-        val dataPart1 = clusters_df.select("prediction","features").rdd.map(row => Utils.converted4(row.toSeq)).zipWithIndex().map(x => (x._1._1,x._1._2,x._2)).toDF("prediction","features","id")
+        val dataPart1 = clusters_df.select("prediction","features").rdd.map(row => Utils.converter(row.toSeq)).zipWithIndex().map(x => (x._1._1,x._1._2,x._2)).toDF("prediction","features","id")
         //val dataPart1 = clusters_df.select("prediction").withColumn("id",monotonicallyIncreasingId)
 
         clusters_df = dataPart1.join(dataPart2, dataPart2("id") === dataPart1("id"))

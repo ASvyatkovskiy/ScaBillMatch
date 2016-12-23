@@ -1,9 +1,11 @@
-import com.typesafe.config._
+//import com.typesafe.config._
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.DataFrame
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
@@ -33,8 +35,6 @@ import org.apache.spark.ml.linalg.{
 }
 
 import java.io._
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
 
 object Utils {
 
@@ -250,26 +250,10 @@ object Utils {
     idfModel.transform(featurized_df).drop("rawFeatures").drop("content")
   }
 
-  //FIXME think about more genmeral way to convert dataframes to RDD and back
-  def converted3(row: scala.collection.Seq[Any]) : (String,String,String,Long,Long) = {
-    val ret = row.asInstanceOf[WrappedArray[Any]]
-    val first = ret(0).asInstanceOf[String]
-    val second = ret(1).asInstanceOf[String]
-    val third = ret(2).asInstanceOf[String]
-    val fourth = ret(3).asInstanceOf[Long]
-    val five = ret(4).asInstanceOf[Long]
-    (first,second,third,fourth,five)
-  }
-
-  def converted4(row: scala.collection.Seq[Any]) : (Int,NewVector) = {
+  def convertedr(row: scala.collection.Seq[Any]) : (Int,NewVector) = {
     val ret = row.asInstanceOf[WrappedArray[Any]]
     val first = ret(0).asInstanceOf[Int]
     val second = ret(1).asInstanceOf[NewVector]
     (first,second)
-  }
-
-  def converted2(row: scala.collection.Seq[Any]) : NewVector = {
-    val ret = row.asInstanceOf[WrappedArray[Any]]
-    ret(0).asInstanceOf[NewVector]
   }
 }
