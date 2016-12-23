@@ -1,5 +1,3 @@
-//import com.typesafe.config._
-
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
@@ -17,7 +15,6 @@ import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 import org.apache.spark.mllib.linalg.SingularValueDecomposition
 import org.apache.spark.mllib.linalg.distributed.{RowMatrix,CoordinateMatrix}
 
-//we have to deal with this nonsense for now
 import org.apache.spark.mllib.linalg.{
   Vector => OldVector,
   Vectors => OldVectors,
@@ -250,10 +247,22 @@ object Utils {
     idfModel.transform(featurized_df).drop("rawFeatures").drop("content")
   }
 
-  def convertedr(row: scala.collection.Seq[Any]) : (Int,NewVector) = {
+  def converter(row: scala.collection.Seq[Any]) : (Int,NewVector) = {
     val ret = row.asInstanceOf[WrappedArray[Any]]
     val first = ret(0).asInstanceOf[Int]
     val second = ret(1).asInstanceOf[NewVector]
     (first,second)
   }
+
+  def twoSidedJoin(cartesian_pairs: RDD, hashed_bills: RDD): RDD = {
+     val firstjoin = cartesian_pairs.map({case (k1,k2) => (k1, (k1,k2))})
+        .join(hashed_bills)
+        .map({case (_, ((k1, k2), v1)) => ((k1, k2), v1)})
+
+     val matches = firstjoin.map({case ((k1,k2),v1) => (k2, ((k1,k2),v1))})
+        .join(hashed_bills)
+        .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))})
+     matches
+  } 
+
 }
