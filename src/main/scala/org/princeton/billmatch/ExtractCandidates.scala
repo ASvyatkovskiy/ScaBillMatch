@@ -1,7 +1,7 @@
 package org.princeton.billmatch
 
 /*
-Application: MakeLabeledCartesian, produce all the pairs of primary keys of the documents satisfying a predicate.
+Application: ExtractCandidates, produce all the pairs of primary keys of the documents satisfying a predicate.
 Perform document bucketing using k-means clustering.
 
 Following are the key parameters that need to be filled in the resources/makeCartesian.conf file:
@@ -29,9 +29,9 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.DataFrame
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.WrappedArray
+import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 
 import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
@@ -43,8 +43,6 @@ import org.apache.spark.mllib.linalg.{
   DenseVector => OldDenseVector,
   VectorUDT => OldVectorUDT}
 
-import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
-
 import org.apache.spark.ml.linalg.{
    Vector => NewVector,
    Vectors => NewVectors,
@@ -53,17 +51,19 @@ import org.apache.spark.ml.linalg.{
 }
 
 import java.io._
-//import org.apache.spark.sql.functions.monotonicallyIncreasingId
+
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
+
 import org.scalatest.Assertions._
 
+import org.princeton.billmatch.feature._
 
-object MakeLabeledCartesian {
+
+object ExtractCandidates {
 
   def main(args: Array[String]) {
 
-    println(s"\nExample submit command: spark-submit --class MakeLabeledCartesian --master yarn --queue production --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.11/BillAnalysis-assembly-2.0.jar\n")
+    println(s"\nExample submit command: spark-submit --class ExtractCandidates --master yarn --queue production --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.11/BillAnalysis-assembly-2.0.jar\n")
 
     val t0 = System.nanoTime()
 
@@ -90,7 +90,7 @@ object MakeLabeledCartesian {
 
   def run(params: Config) {
 
-    val spark = SparkSession.builder().appName("MakeLabeledCartesian")
+    val spark = SparkSession.builder().appName("ExtractCandidates")
       //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
       .config("spark.shuffle.memoryFraction","0.6")

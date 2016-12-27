@@ -1,4 +1,5 @@
-package org.princeton.billmatch.similarity
+package org.princeton.billmatch
+package similarity
 
 import breeze.linalg.norm
 import org.apache.spark.ml.linalg.{SparseVector, Vector, Vectors}
@@ -14,16 +15,17 @@ import org.apache.spark.ml.linalg.LinalgShim
  * to provide a common interface that works for Cosine, Jaccard, hamming and Manhattan
  * similarity along with other similarities. 
  */
-private abstract class SimilarityMeasure extends Serializable {
+
+abstract class SimilarityMeasure extends Serializable {
   def compute(v1: Vector, v2: Vector): Double
 }
 
-private final object CosineSimilarity extends SimilarityMeasure {
+final object CosineSimilarity extends SimilarityMeasure {
 
   /**
    * Compute cosine similarity between vectors
    *
-   * LinalgShim reaches into Spark's private linear algebra
+   * LinalgShim reaches into Spark's linear algebra
    * code to use a BLAS dot product. Could probably be
    * replaced with a direct invocation of the appropriate
    * BLAS method.
@@ -35,7 +37,7 @@ private final object CosineSimilarity extends SimilarityMeasure {
   }
 }
 
-private final object ManhattanSimilarity extends SimilarityMeasure {
+final object ManhattanSimilarity extends SimilarityMeasure {
 
   /**
    * Compute Manhattan similarity between vectors using
@@ -48,7 +50,7 @@ private final object ManhattanSimilarity extends SimilarityMeasure {
   }
 }
 
-private final object HammingSimilarity extends SimilarityMeasure {
+final object HammingSimilarity extends SimilarityMeasure {
   
   /**
    * Compute Hamming similarity between vectors on a bit-level
@@ -73,7 +75,7 @@ private final object HammingSimilarity extends SimilarityMeasure {
 }
 
 
-private final object JaccardSimilarity extends SimilarityMeasure {
+final object JaccardSimilarity extends SimilarityMeasure {
 
   /**
    * Compute Jaccard similarity between vectors
@@ -92,7 +94,7 @@ private final object JaccardSimilarity extends SimilarityMeasure {
 }
 
 
-private final object DenseJaccardSimilarity extends SimilarityMeasure {
+final object DenseJaccardSimilarity extends SimilarityMeasure {
 
   def compute(v1: Vector, v2: Vector) : Double = {
      val s = v1.toDense.values.zip(v2.toDense.values) count (x => x._1 != x._2)

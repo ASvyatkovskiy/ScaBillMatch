@@ -28,6 +28,8 @@ import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
+import org.princeton.billmatch.feature._
+
 object LDAAnalyzer {
 
   def main(args: Array[String]) {
@@ -43,24 +45,6 @@ object LDAAnalyzer {
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
   }
 
-
-  def customNPartitions(directory: File) : Int = {
-      var len = 0.0
-      val all: Array[File] = directory.listFiles()
-      for (f <- all) {
-        if (f.isFile())
-            len = len + f.length()
-        else
-            len = len + customNPartitions(f)
-      }
-      //353 GB worked with 7000 partitions
-      val npartitions = (7.0*len/350000000.0).toInt
-      npartitions  
-  }
-
-  def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
-     a ++ b
-  }   
 
   def run(params: Config) {
 

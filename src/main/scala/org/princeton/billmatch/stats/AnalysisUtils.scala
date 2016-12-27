@@ -1,4 +1,5 @@
-package org.princeton.billmatch.stats
+package org.princeton.billmatch
+package stats
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
@@ -30,6 +31,8 @@ import org.apache.spark.ml.linalg.{
 }
 
 import org.apache.spark.rdd.RDD
+
+import org.princeton.billmatch.feature._
 
 object AnalysisUtils {
 

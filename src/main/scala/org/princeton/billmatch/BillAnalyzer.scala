@@ -15,15 +15,15 @@ import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
-
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
+
 import scala.collection.mutable.WrappedArray
 
-import java.io._
+import org.princeton.billmatch.feature._
+import org.princeton.billmatch.similarity._
 
 object BillAnalyzer {
 
