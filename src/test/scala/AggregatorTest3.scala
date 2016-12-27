@@ -3,20 +3,20 @@ import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.{Encoder, Encoders}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.types._
-import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable._
 
 import org.apache.spark.sql.functions._
 
-import scala.collection.mutable.WrappedArray
-
 import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
-
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
 import org.apache.spark.RangePartitioner
+
+import org.princeton.billmatch.feature._
+import org.princeton.billmatch.similarity._
+import org.princeton.billmatch._
 
 object AggregatorTest3 {
 
