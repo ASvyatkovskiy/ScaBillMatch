@@ -114,7 +114,7 @@ object MinHashLSHExample {
     val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(compactSelector_udf(col("content")))
 
     //val npartitions = (4*input.count()/1000).toInt
-    val bills = input.repartition(400,col("primary_key"))  //Math.max(npartitions,200),col("primary_key")) //,col("content"))
+    val bills = input //.repartition(400,col("primary_key"))  //Math.max(npartitions,200),col("primary_key")) //,col("content"))
     bills.explain
 
     val nGramGranularity = params.getInt("makeCartesian.nGramGranularity")
@@ -147,10 +147,10 @@ object MinHashLSHExample {
     //val (precision, recall) = calculateApproxSimilarityJoin(mh, df1, df2, 0.5)
     //assert(precision == 1.0)
     //assert(recall >= 0.7)
-    val part1 = featurized_df.filter(col("state") === 29) //.coalesce(200).cache()
+    val part1 = featurized_df.filter(col("state") === 39) //.coalesce(200).cache()
     println(part1.count())
     part1.explain()
-    val part2 = featurized_df.filter(col("state") === 5) //.coalesce(200).cache()
+    val part2 = featurized_df.filter(col("state") === 8) //.coalesce(200).cache()
     println(part2.count())
     part2.explain()
     calculateApproxSimilarityJoin2(mh,part1,part2,0.1)

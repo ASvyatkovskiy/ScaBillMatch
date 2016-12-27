@@ -1,3 +1,5 @@
+package org.princeton.billmatch
+
 /*LDAAnalyzer: an app. that performs document or section similarity searches starting off CartesianPairs
 
 Following parameters need to be filled in the resources/ldaAnalyzer.conf file:
@@ -13,38 +15,22 @@ import com.typesafe.config._
 import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.types._
 
 import org.apache.spark.ml.feature.{HashingTF, IDF}
 import org.apache.spark.ml.feature.{RegexTokenizer, Tokenizer}
 import org.apache.spark.ml.feature.NGram
 import org.apache.spark.ml.feature.StopWordsRemover
-
-//import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
-
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types._
+import org.apache.spark.ml.clustering.LDA
 
 import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
-import java.io._
-
-import org.apache.spark.ml.clustering.LDA
-import org.apache.spark.mllib.linalg.Vectors
-
+import org.princeton.billmatch.feature._
 
 object LDAAnalyzer {
-
-  def converted(row: scala.collection.Seq[Any]) : Tuple2[String,SparseVector] = { 
-    val ret = row.asInstanceOf[WrappedArray[Any]]
-    val first = ret(0).asInstanceOf[String]
-    val second = ret(1).asInstanceOf[Vector]
-    Tuple2(first,second.toSparse)
-  }
-
-  //get type of var utility 
-  def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
 
   def main(args: Array[String]) {
 
@@ -59,24 +45,6 @@ object LDAAnalyzer {
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
   }
 
-
-  def customNPartitions(directory: File) : Int = {
-      var len = 0.0
-      val all: Array[File] = directory.listFiles()
-      for (f <- all) {
-        if (f.isFile())
-            len = len + f.length()
-        else
-            len = len + customNPartitions(f)
-      }
-      //353 GB worked with 7000 partitions
-      val npartitions = (7.0*len/350000000.0).toInt
-      npartitions  
-  }
-
-  def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
-     a ++ b
-  }   
 
   def run(params: Config) {
 

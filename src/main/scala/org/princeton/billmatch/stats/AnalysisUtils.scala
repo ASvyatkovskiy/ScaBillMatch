@@ -1,15 +1,15 @@
-import com.typesafe.config._
+package org.princeton.billmatch
+package stats
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
-
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.WrappedArray
+import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
 import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
+import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 
 import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 import org.apache.spark.mllib.linalg.SingularValueDecomposition
@@ -23,8 +23,6 @@ import org.apache.spark.mllib.linalg.{
   DenseVector => OldDenseVector,
   VectorUDT => OldVectorUDT}
 
-import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
-
 import org.apache.spark.ml.linalg.{
    Vector => NewVector,
    Vectors => NewVectors,
@@ -32,9 +30,9 @@ import org.apache.spark.ml.linalg.{
    SparseVector => NewSparseVector
 }
 
-import java.io._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
+
+import org.princeton.billmatch.feature._
 
 object AnalysisUtils {
 

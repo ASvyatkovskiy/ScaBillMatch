@@ -1,15 +1,20 @@
+package org.princeton.billmatch
+package feature
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
+
+import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
 import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
 import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
+import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 
 import org.apache.spark.mllib.linalg.{Matrix, Matrices}
 import org.apache.spark.mllib.linalg.SingularValueDecomposition
@@ -22,8 +27,6 @@ import org.apache.spark.mllib.linalg.{
   DenseVector => OldDenseVector,
   VectorUDT => OldVectorUDT}
 
-import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
-
 import org.apache.spark.ml.linalg.{
    Vector => NewVector,
    Vectors => NewVectors,
@@ -33,7 +36,7 @@ import org.apache.spark.ml.linalg.{
 
 import java.io._
 
-object Utils {
+object Utils { 
 
   /**
    * Finds the product of a distributed matrix and a diagonal matrix represented by a vector.
@@ -264,5 +267,4 @@ object Utils {
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))})
      matches
   } 
-
 }

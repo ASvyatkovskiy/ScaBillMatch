@@ -1,3 +1,5 @@
+package org.princeton.billmatch
+
 /*BillAnalyzer: an app. that performs document or section all=pairs similarity starting off CartesianPairs
 
 Following are the key parameters need to be filled in the resources/billAnalyzer.conf file:
@@ -13,15 +15,15 @@ import org.apache.spark.{SparkConf, SparkContext, SparkFiles}
 import org.apache.spark.SparkContext._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
-
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
+
 import scala.collection.mutable.WrappedArray
 
-import java.io._
+import org.princeton.billmatch.feature._
+import org.princeton.billmatch.similarity._
 
 object BillAnalyzer {
 
