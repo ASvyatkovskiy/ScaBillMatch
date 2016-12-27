@@ -1,4 +1,4 @@
-package org.princeton.billmatch
+package org.princeton.billmatch.similarity
 
 import breeze.linalg.norm
 import org.apache.spark.ml.linalg.{SparseVector, Vector, Vectors}
