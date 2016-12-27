@@ -13,3 +13,5 @@ libraryDependencies ++= Seq(
 //libraryDependencies += "com.databricks" %% "spark-avro" % "2.0.1"
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.4.0"
 libraryDependencies += "com.typesafe" % "config" % "1.3.0"
+libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging-api" % "2.1.2"
+libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2"
