@@ -1,8 +1,47 @@
 # ScaBillMatch [![Build Status](https://travis-ci.org/ASvyatkovskiy/ScaBillMatch.svg?branch=master)](https://travis-ci.org/ASvyatkovskiy/ScaBillMatch.svg?branch=master)
 
-Scala based reboot of diffusion study (bill match)
+Policy diffusion occurs when government decisions in a given jurisdiction are systematically influenced by prior policy choices made in other jurisdictions [Gilardi]. While policy diffusion can manifest in a variety of forms, we focus on a
+type of policy diffusion that can be detected by examining similarity of legislative bill texts. We aim to identify groups of legislative bills from different states falling into the same diffusion topic, to perform an all-pairs comparison between the bills within each topic, and to identify paths connecting specific legislative proposals on a graph.
 
-## Calculate candidate pairs 
+
+## Data ingestion
+
+During ingestion step the raw unstructured data are converted into JSON and, subsequently, Apache Avro format having following schema:
+
+```json
+{"namespace" : "bills.avro" ,
+   "type": "record",
+   "name": "Bills",
+   "fields": [
+      {"name": "primary_key" , "type": "string"},
+      {"name": "content" , "type" : "string"}
+      {"name": "year" , "type" : "int"},
+      {"name": "state" , "type" : "int"},
+      {"name": "docversion" , "type" : "string"}
+      ]
+}
+```
+
+where the `primary_key` field is a unique identifier of the elements in the dataset constructed from year, state and
+document version. The year, state and docversion fields are used to construct predicates and filter the data before the allpairs
+similarity join calculation. The `content` field stores the entire legislative proposal as a unicode string. It is only used for feature extraction step, and is not read into memory during candidate selection and filtering steps, thanks to the Avro schema evolution property. 
+
+Avro schema is stored in a file along with the data. Thus, if the program reading the data expects a different schema this can be easily resolved by setting the `avro.input.schema.key` in the Spark application, since the schemas of Avro writer and reader are both present.
+
+The data ingestion steps would differ depending on the dataset structure/type.
+
+
+
+
+## Pre-processing and feature extraction
+
+The feature extraction step consists of a sequence of `Spark ML` transformers intended to produce numerical feature vectors
+as a dataframe column. The resulting dataframe is fed to Spark ML k-means estimator, later used to calculate the all-pairs join, and subsequently during the graph analysis step with `GraphFrames`.
+
+
+
+
+## Candidate aselection and clustering  
 
 On the first step, a set of eligible candidate pairs is evaluated. This can either be all distinct combinatorial pairs of documents in a corpus (all-against-all), or set of pairs satisfying some stricter selection requirements in addition (one-against-all). 
 
@@ -33,7 +72,7 @@ scala> mydata.take(5)
 
 Note the `--jars` parameter, which is intended to include various case classes defined in the code to the classpath (namely, `CartesianPair`)
 
-## Calculate document similarity: Rabin-Karpe rolling n-gram and n-gram hashing 
+## Document similarity calculation
 
 With `DocumentAnalyzer`, one can calculate similarity among feature vectors representing the text documents. All possible combinations of eligible pairs obtained on the previous step are considered.
 
@@ -44,9 +83,6 @@ Following parameters need to be filled in the `resources/documentAnalyzer.conf` 
 * outputMainFile: key-key pairs and corresponding similarities, as `Tuple2[Tuple2[String,String],Double]`
 * outputFilteredFile: `CartesianPairs` passing similarity threshold
 
-### Feature extraction
-
-The text features are extracted from the documents using the Rabin-Karpe rolling n-gram approach. The size of the n-gram is configurable, but smaller sizes are preferred.   
 
 ### Similarity calculation
 
