@@ -13,24 +13,30 @@ import org.graphframes._
 
 object GraphUtils {
 
-  def createGF(spark: SparkSession, matches: RDD[Tuple2[(String,String),Double]], rescaled_df: DataFrame) : GraphFrame = {
+  def createGF(spark: SparkSession, matches: RDD[Tuple2[(String,String),Double]], df: DataFrame) : GraphFrame = {
      import spark.implicits._
 
      val edges_df = matches.map({case ((k1,k2), v1)=>(k1, k2, v1)}).toDF("src","dst","similarity")
-     edges_df.printSchema
-     edges_df.show()
-
-     val vertices_df = rescaled_df.select(col("primary_key").alias("id"), col("content"))
-     vertices_df.printSchema
-     vertices_df.show()
+     val vertices_df = df.select(col("primary_key").alias("id"), col("content"))
      GraphFrame(vertices_df,edges_df)
   }
 
-  def pageRank(gr: GraphFrame) : Unit = { 
-    //gr.vertices.filter("age > 35")
-    //gr.edges.filter("similarity > 20")
-    //gr.inDegrees.filter("inDegree >= 2")
-    val results = gr.pageRank.resetProbability(0.01).run()
-    results.vertices.select("primary_key", "pagerank").show()
+  def runPageRank(gf: GraphFrame, prob: Double, maxIterations: Integer, getEdgeWeights: Boolean = false) : DataFrame = { 
+    val results = gf.pageRank.resetProbability(prob).maxIter(maxIterations).run()
+    if (getEdgeWeights) {
+       results.edges.select("src", "dst", "weight")
+    } else {
+       results.vertices.select("id", "pagerank")
+    }
+  }
+
+  def runShortestPaths(gf: GraphFrame, from_vertex: String, to_vertex: String) : DataFrame = {
+    val results = gf.shortestPaths.landmarks(Seq(from_vertex,to_vertex)).run()
+    results.select(col("id_from"), explode(col("distances")).as("id_to" :: "distances" :: Nil))
+  }
+
+  def runTriangleCount(gf: GraphFrame) : DataFrame = {
+    val results = gf.triangleCount.run() 
+    results.select("id", "count")
   }
 }
