@@ -30,142 +30,134 @@ Avro schema is stored in a file along with the data. Thus, if the program readin
 
 The data ingestion steps would differ depending on the dataset structure/type.
 
-
-
+#FIXME code smnippet for raw to JSON conversion
+#FIXME code snippet for JSOn to Avro conversion
 
 ## Pre-processing and feature extraction
 
 The feature extraction step consists of a sequence of `Spark ML` transformers intended to produce numerical feature vectors
 as a dataframe column. The resulting dataframe is fed to Spark ML k-means estimator, later used to calculate the all-pairs join, and subsequently during the graph analysis step with `GraphFrames`.
 
+### Types of features
 
+ 1. Bag-of-words and the N-gram
+ 1. Term frequency and inverse document frequency (TF-IDF)
+ 1. Minhash features
 
+Different types of text features has been found to perform better for each type of simialrity measures. For instance, TF-IDF (small granularity N gram) +truncated SVD is best suited for cosine similarity calcualtions. Jaccard similarity perofrms best with unweighted features (i.e. MinHash or TF), larger N gram granularity is preferred for the latter.
 
-## Candidate aselection and clustering  
+### Dimensionality reduction
 
-On the first step, a set of eligible candidate pairs is evaluated. This can either be all distinct combinatorial pairs of documents in a corpus (all-against-all), or set of pairs satisfying some stricter selection requirements in addition (one-against-all). 
+Singular value decomposition (SVD) is applied to the TF-IDF document-feature matrix to extract concepts which are most relevant for classification.
 
-`MakeCartesian` class will produce all the pairs of primary keys of the documents satisfying a predicate.
-Following parameters need to be filled in the `resources/makeCartesian.conf` file:
-* docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted... Leaving it an empty string will take all of the versions into account.
-* nPartitions: number of partitions in bills_meta RDD
-* use_strict: boolean, yes or no to consider stricter selection
-* strict_state: specify state (a long integer from 1 to 50)
-* strict_docid: specify document ID for one-against-all user selection (for instance, HB1175)
-* strict_year: specify year for one-against-all user selection (for instance, 2006)
-* inputFile: input file, one JSON per line
-* outputFile: output file
+## Candidate selection and clustering  
 
-Example submit command:
+Focusing on the document vectors which are likely to be highly similar is essential for all-pairs comparison at scale.
+Modern studies employ variations of nearest-neighbor search, locality sensitive hashing, as well as sampling techniques to select a subset of rows of TF-IDF matrix based on the sparsity [DIMSUM]. 
+Our approach currently utilizes k-means clustering to identify groups of documents which are likely to belong to the same diffusion topic, reducing the number of comparisons in the all-pairs similarity join calculation. In addition, `LSH` and `BucketedrandomProjectionLSH` are being added based on `Spark ML` implementation.
 
-```bash
-spark-submit --class MakeCartesian --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar
-```
+#FIXME copy paste the submission command for this step
+#FIXME describe the configuration file parameters to show how to configure options described above
 
-Example spark-shell session (Scala) to explore the output:
-```bash
-$ spark-shell --jars target/scala-2.10/BillAnalysis-assembly-1.0.jar 
-scala> val mydata = sc.objectFile[CartesianPair]("/user/alexeys/valid_pairs")
-mydata: org.apache.spark.rdd.RDD[CartesianPair] = MapPartitionsRDD[3] at objectFile at <console>:27
-scala> mydata.take(5)
-```
-
-Note the `--jars` parameter, which is intended to include various case classes defined in the code to the classpath (namely, `CartesianPair`)
 
 ## Document similarity calculation
 
-With `DocumentAnalyzer`, one can calculate similarity among feature vectors representing the text documents. All possible combinations of eligible pairs obtained on the previous step are considered.
+We consider Jaccard, Cosine, manhattan and Hamming distances. We convert those to similarities assuming inverse proportionality, and re-scale all similarities to a common range, adding an extra additive term in the denominator serves as a regularization
+parameter for the case of identical vectors.
 
-Following parameters need to be filled in the `resources/documentAnalyzer.conf` file:
-* secThreshold: Minimum Jaccard similarity to inspect on section level 
-* inputBillsFile: bill input file, one JSON per line
-* inputPairsFile: `CartesianPairs` input object file
-* outputMainFile: key-key pairs and corresponding similarities, as `Tuple2[Tuple2[String,String],Double]`
-* outputFilteredFile: `CartesianPairs` passing similarity threshold
-
-
-### Similarity calculation
-
-### Examples
-
-Example submit command:
-```bash
-spark-submit --class DocumentAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar
-```
-
-Example spark-shell session (Scala) to explore the output. Following example shows how to interactively load the output file having a format primary-primary key / similarity value, select only a specific version of document, sort the data by similarity values, print top 100 pairs with highest similarity to standard output:
-```bash
-val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alex/output_docs").cache()
-val filtered_data = data_jaccard.filter({case ((k1,k2),v) => ((k1 contains "CO_2006_HB1175") || (k2 contains "CO_2006_HB1175"))})
-val sorted_data = filtered_data.map(x => x.swap).sortByKey(false)
-for (s <- sorted_data_jaccard.take(100)) {
-   println(s)
-}
-```
-More advanced interactive analysis, including plotting, is possible with `Histogrammar` package described below.
-
-### Section-level similarity 
-
-
-## Calculate document similarity: bag-of-words and TF-IDF
-
-Calculate document/section similarity using bag-of-words and TF-IDF for feature extraction. 
-
-Following parameters need to be filled in the `resources/adhocAnalyzer.conf` file:
-* nPartitions: Number of partitions in bills_meta RDD
-* numTextFeatures: Number of text features to keep in hashingTF
-* measureName: Distance measure used
-* inputBillsFile: bill input file, one JSON per line
-* inputPairsFile: CartesianPairs object input file
-* outputMainFile: key-key pairs and corresponding similarities, as `Tuple2[Tuple2[String,String],Double]`
-* outputFilteredFile: `CartesianPairs` passing similarity threshold
-    
-
-Example submit command:
-```bash
-spark-submit  --class AdhocAnalyzer --master yarn-client --num-executors 30 --executor-cores 3 --executor-memory 10g target/scala-2.10/BillAnalysis-assembly-1.0.jar
-```
-
-### Section-level similarity
-
-## Calculate document similarity: locality sensitive hashing
+#FIXME describe the configuration file parameters to show how to configure options described above
 
 ## Exploratory analysis: histogramming and plotting
 
-Considering that the `MakeCartesian` and analysis steps (for instance, `AdhocAnalyzer`) have been ran, and the object file conraining 
-the primary key pairs and corresponsing similarities in the format `Tuple2[Tuple2[String,String],Double]` is available in HDFS,
-one can easily perform histogram aggregation and visualization steps using Scala-based `Histogrammar` package.
+Histogrammar [http://histogrammar.org/docs/] is a suite of data aggregation primitives for making histograms, calculating descriptive statistics and plotting. A few composable functions can generate many different types of plots, and these functions are reimplemented in multiple languages and serialized to JSON for cross-platform compatibility. Histogrammar allows to aggregate data using cross-platform, functional primitives, summarizing a large dataset with discretized distributions, using lambda functions and composition rather than a restrictive set of histogram types.
 
+To use Histogrammar in the Spark shell, you don’t have to download anything. Just start Spark with
 
-### Download and install `Histogrammar`
-
-Download and install the Histogrammar package following the isntructions here: http://histogrammar.org
-
-### Interactive data aggragation
-
-Start the interactive `spark-shell` session pointing to all the Histogrammar jars and the BillAnalysis jars, and do:
+```bash
+spark-shell --packages "org.diana-hep:histogrammar_2.11:1.0.4"
+```
+and call
 
 ```scala
 import org.dianahep.histogrammar._
-import org.dianahep.histogrammar.bokeh._
+```
+on the Spark prompt. For plotting with Bokeh, `include org.diana-hep:histogrammar-bokeh_2.11:1.0.4` and for interaction with Spark-SQL, include `org.diana-hep:histogrammar-sparksql_2.11:1.0.4`.
 
-val data = sc.objectFile[Tuple2[Tuple2[String,String],Double]]("/user/alex/output").cache()
-val sim_histogram = Histogram(200, 0, 100, {matches: Tuple2[Tuple2[String,String],Double] => matches._2})
-val final_histogram = data.aggregate(sim_histogram)(new Increment, new Combine)
+### Example of stat analysis with Spark and Histogrammar
 
-val plot_all = final_histogram.bokeh().plot(xLabel="Jaccard",yLabel="Num. pairs")
-save(plot_all,"similarities.html")
+Given the cosine and jaccard output files on the key-key pair, and convert it to dataframe:
+
+```scala
+val data = cosineRDD.join(jaccardRDD).toDF("cosine","jaccard")
+data.write.parquet("/user/alexeys/correlations_3state")
 ```
 
-This will produce an html file with the plot, which you can view by pointing a webbrowser to path to that file, for instance:
+Launch spark-shell session with histogrammar pre-loaded:
 
 ```bash
-firefox --no-remote file:///path_to_html_file/similarity.html
+spark-shell --master yarn --queue production --num-executors 20 --executor-cores 3 --executor-memory 10g --packages "org.diana-hep:histogrammar-bokeh_2.10:1.0.3" --jars target/scala-2.11/BillAnalysis-assembly-2.0.jar 
 ```
 
-Read following documentation pages for more details on `histogrammar` package: http://histogrammar.org/docs/specification/
-And here: http://histogrammar.org/scala/0.6/index.html#package
+Get basic descriptive statistics:
 
-## Similarity of legislative proposals as a graph problem
+```scala
+scala> data.describe().show()
++-------+--------------------+------------------+
+|summary|              cosine|           jaccard|
++-------+--------------------+------------------+
+|  count|          2632811191|        2632811191|
+|   mean|   2.648025009784054|11.899197957421478|
+| stddev|  3.2252594746900303|3.5343401388251032|
+|    min|2.389704494502045...|1.4545454545454546|
+|    max|   98.63368807585896| 81.14406779661016|
++-------+--------------------+------------------+
+```
 
-PageRank, Dijsktra paths, GraphFrames
+Get correlation coefficients and distributions in 10 bins:
+
+```scala
+scala> val cosine_rdd = data.select("cosine").rdd.map(x=>x.getDouble(0))
+cosine_rdd: org.apache.spark.rdd.RDD[Double] = MapPartitionsRDD[4] at map at <console>:27
+
+scala> val jaccard_rdd = data.select("jaccard").rdd.map(x=>x.getDouble(0))
+jaccard_rdd: org.apache.spark.rdd.RDD[Double] = MapPartitionsRDD[7] at map at <console>:27
+
+scala> import org.dianahep.histogrammar._
+import org.dianahep.histogrammar._
+
+scala> import org.dianahep.histogrammar.ascii._
+import org.dianahep.histogrammar.ascii._
+
+scala> val histo = Histogram(10,0,100,{x: Double => x})
+histo: org.dianahep.histogrammar.Selecting[Double,org.dianahep.histogrammar.Binning[Double,org.dianahep.histogrammar.Counting,org.dianahep.histogrammar.Counting,org.dianahep.histogrammar.Counting,org.dianahep.histogrammar.Counting]] = <Selecting cut=Bin>
+
+scala> val jaccard_histo = jaccard_rdd.aggregate(histo)(new Increment, new Combine)
+jaccard_histo: org.dianahep.histogrammar.Selecting[Double,org.dianahep.histogrammar.Binning[Double,org.dianahep.histogrammar.Counting,org.dianahep.histogrammar.Counting,org.dianahep.histogrammar.Counting,org.dianahep.histogrammar.Counting]] = <Selecting cut=Bin>
+
+scala> jaccard_histo.println
+                       +----------------------------------------------------------+
+underflow     0        |                                                          |
+[  0 ,  10 )  7.943E+8 |***********************                                   |
+[  10,  20 )  1.792E+9 |*****************************************************     |
+[  20,  30 )  4.668E+7 |*                                                         |
+[  30,  40 )  2.269E+5 |                                                          |
+[  40,  50 )  5661     |                                                          |
+[  50,  60 )  572      |                                                          |
+[  60,  70 )  125      |                                                          |
+[  70,  80 )  57       |                                                          |
+[  80,  90 )  4        |                                                          |
+[  90,  100)  0        |                                                          |
+overflow      0        |                                                          |
+nanflow       0        |                                                          |
+                       +----------------------------------------------------------+
+```                      
+
+For more details on how to use Histogrammar, refer to the website: http://histogrammar.org/docs/
+
+## Reformulating the problem as a network (graph) problem
+
+Some policy diffusion questions are easier answered if the problem is formulated as a graph analysis problem. The dataframe output of the document similarity step is mapped onto a weighted undirected graph, considering each unique legislative proposal as a node and a presence of a document with similarity above a certain threshold as an edge with a weight attribute equal to the similarity. 
+
+The PageRank and Dijkstra minimum cost path algorithms are applied to detect events of policy diffusion and the most influential states. A GraphFrame is constructed using two dataframes (a dataframe of nodes and an edge dataframe), allowing to easily integrate the graph processing step into the pipeline along with Spark ML, without a need to move the results of previous steps manually and feeding them to the graph processing module from an intermediate sink, like with isolated graph analysis systems.
+
+#FIXME describe the configuration file parameters to show how to configure options described above
