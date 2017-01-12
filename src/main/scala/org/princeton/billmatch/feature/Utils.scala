@@ -34,32 +34,11 @@ import org.apache.spark.ml.linalg.{
    SparseVector => NewSparseVector
 }
 
+import org.princeton.billmatch.linalg._
+
 import java.io._
 
 object Utils { 
-
-  /**
-   * Finds the product of a distributed matrix and a diagonal matrix represented by a vector.
-   */
-  def multiplyByDiagonalMatrix(mat: RowMatrix, diag: OldVector): RowMatrix = {
-    val sArr = diag.toArray
-    new RowMatrix(mat.rows.map(vec => {
-      val vecArr = vec.toArray
-      val newArr = (0 until vec.size).toArray.map(i => vecArr(i) * sArr(i))
-      OldVectors.dense(newArr)
-    }))
-  }
-
-  /*MLlib ML convertion tools*/
-  def toOld(v: NewVector): OldVector = v match {
-    case sv: NewSparseVector => OldVectors.sparse(sv.size, sv.indices, sv.values)
-    case dv: NewDenseVector => OldVectors.dense(dv.values)
-  }
-
-  def toNew(v: OldVector): NewVector = v match {
-    case sv: OldSparseVector => NewVectors.sparse(sv.size, sv.indices, sv.values)
-    case dv: OldDenseVector => NewVectors.dense(dv.values)
-  }
 
   def pairup (document: MetaLabeledDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaLabeledDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int], onlyInOut: Boolean) : (MetaLabeledDocument, Array[CartesianPair]) = {
 
@@ -112,11 +91,6 @@ object Utils {
   //get type of var utility 
   def manOf[T: Manifest](t: T): Manifest[T] = manifest[T]
 
-  //Calculate submatrix containing nColsToKeep of inital matrix A. This is used for truncating the V.T matrix in SVD 
-  def truncatedMatrix(a: Matrix, nColsToKeep: Int): Matrix = {
-      Matrices.dense(a.numRows,nColsToKeep,a.toArray.slice(0,a.numRows*nColsToKeep))
-  }
-
   def customNPartitions(directory: File) : Int = {
       var len = 0.0
       val all: Array[File] = directory.listFiles()
@@ -165,37 +139,12 @@ object Utils {
     val U: RowMatrix = svd.U  // The U factor is a RowMatrix.
     val s: OldVector = svd.s  // The singular values are stored in a local dense vector.
     var VT: Matrix = svd.V.transpose  // The V factor is a local dense matrix.
-    val us: RowMatrix = multiplyByDiagonalMatrix(U,s)
-    var reconstructed = us.multiply(truncatedMatrix(VT,keepConcepts)).rows.map(x => toNew(x)).map(x => Row(x))
+    val us: RowMatrix = LinalgUtils.multiplyByDiagonalMatrix(U,s)
+    var reconstructed = us.multiply(LinalgUtils.truncatedMatrix(VT,keepConcepts)).rows.map(x => LinalgUtils.toNew(x)).map(x => Row(x))
 
     val reco_schema = StructType(Seq(StructField("features", VectorType, false)))
     spark.createDataFrame(reconstructed,reco_schema)
   }
-
-
-  def transposeRowMatrix(m: RowMatrix): RowMatrix = {
-     val transposedRowsRDD = m.rows.zipWithIndex.map{case (row, rowIndex) => rowToTransposedTriplet(row, rowIndex)}
-       .flatMap(x => x) // now we have triplets (newRowIndex, (newColIndex, value))
-       .groupByKey
-       .sortByKey().map(_._2) // sort rows and remove row indexes
-       .map(buildRow) // restore order of elements in each row and remove column indexes
-     new RowMatrix(transposedRowsRDD)
-   }
-
-
-  def rowToTransposedTriplet(row: OldVector, rowIndex: Long): Array[(Long, (Long, Double))] = {
-     val indexedRow = row.toArray.zipWithIndex
-     indexedRow.map{case (value, colIndex) => (colIndex.toLong, (rowIndex, value))}
-   }
-
-  def buildRow(rowWithIndexes: Iterable[(Long, Double)]): OldVector = {
-     val resArr = new Array[Double](rowWithIndexes.size)
-     rowWithIndexes.foreach{case (index, value) =>
-         resArr(index.toInt) = value
-     }
-     OldVectors.dense(resArr)
-   } 
-
 
   def LSAmatrix(spark: SparkSession, dataRDD: RDD[OldVector], numConcepts: Int, keepConcepts: Int) : RowMatrix = {
     //same as above, but prepare output in the format DIMSUM expects it (transposed RowMatrix)
@@ -204,9 +153,9 @@ object Utils {
     val U: RowMatrix = svd.U  // The U factor is a RowMatrix.
     val s: OldVector = svd.s  // The singular values are stored in a local dense vector.
     var VT: Matrix = svd.V.transpose  // The V factor is a local dense matrix.
-    val us: RowMatrix = multiplyByDiagonalMatrix(U,s)
-    val reconstructed = us.multiply(truncatedMatrix(VT,keepConcepts))
-    transposeRowMatrix(reconstructed)
+    val us: RowMatrix = LinalgUtils.multiplyByDiagonalMatrix(U,s)
+    val reconstructed = us.multiply(LinalgUtils.truncatedMatrix(VT,keepConcepts))
+    LinalgUtils.transposeRowMatrix(reconstructed)
   }
 
   def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
@@ -267,4 +216,18 @@ object Utils {
         .map({case(_, (((k1,k2), v1), v2))=>((k1, k2),(v1, v2))})
      matches
   } 
+
+  def compactSelector_udf = udf((s: String) => {
+
+       val probe = s.toLowerCase()
+
+       val compactPattern = "compact".r
+       val isCompact = compactPattern.findFirstIn(probe).getOrElse("")
+
+       val uniformPattern = "uniform".r
+       val isUniform = uniformPattern.findFirstIn(probe).getOrElse("")
+
+       (isCompact.isEmpty() && isUniform.isEmpty())
+    })
+
 }
