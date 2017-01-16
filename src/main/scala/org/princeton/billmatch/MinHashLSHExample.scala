@@ -54,18 +54,44 @@ object MinHashLSHExample {
       lsh: LSH[T],
       datasetA: Dataset[_],
       datasetB: Dataset[_],
-      threshold: Double): Unit = {
+      threshold: Double,
+      state_pair: String): Unit = {
     val model = lsh.fit(datasetA)
     val inputCol = model.getInputCol
 
-    // Compute actual
+    println("Compute actual")
     val actual = model.approxSimilarityJoin(datasetA, datasetB, threshold)
-    actual.show()
+    //actual.show(4000)
     actual.printSchema()
-    actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).write.parquet("/user/alexeys/test_similarity_join")
+    actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).write.parquet("/user/alexeys/test_similarity_join"+state_pair)
     //actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).show() 
   }
 
+  def calculateFor2States[T <: LSHModel[T]](
+      lsh: LSH[T],
+      pp: List[Long],
+      df: Dataset[_],
+      threshold: Double): Unit = {
+
+      val part1 = df.filter(col("state") === pp(0)) //.coalesce(200).cache()
+      val part2 = df.filter(col("state") === pp(1))
+      val state_pair = pp(0).toString+pp(1).toString
+      calculateApproxSimilarityJoin2(lsh,part1,part2,threshold,state_pair)
+  }
+
+  def calculateFor2States2[T <: LSHModel[T]](
+      lsh: LSH[T],
+      pp: Tuple2[Int,List[Int]],
+      df: Dataset[_],
+      threshold: Double): Unit = {
+
+      val part1 = df.filter(col("state") === pp._1) //.coalesce(200).cache()
+      for (p <- pp._2) {
+        val part2 = df.filter(col("state") === p) 
+        val state_pair = pp._1.toString+p.toString
+        calculateApproxSimilarityJoin2(lsh,part1,part2,threshold,state_pair)
+      } 
+  }
 
   def main(args: Array[String]) {
 
@@ -114,7 +140,8 @@ object MinHashLSHExample {
     val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(compactSelector_udf(col("content")))
 
     //val npartitions = (4*input.count()/1000).toInt
-    val bills = input //.repartition(400,col("primary_key"))  //Math.max(npartitions,200),col("primary_key")) //,col("content"))
+    //val bills = input.coalesce(100).cache() - 18573 seconds, vs 30000 seconds sequential
+    val bills = input.repartition(400,col("primary_key")).cache()  //Math.max(npartitions,200),col("primary_key")) //,col("content"))
     bills.explain
 
     val nGramGranularity = params.getInt("makeCartesian.nGramGranularity")
@@ -144,20 +171,17 @@ object MinHashLSHExample {
       .setOutputCol("values")
       .setSeed(12345)
 
-    //val (precision, recall) = calculateApproxSimilarityJoin(mh, df1, df2, 0.5)
-    //assert(precision == 1.0)
-    //assert(recall >= 0.7)
-    val part1 = featurized_df.filter(col("state") === 39) //.coalesce(200).cache()
-    println(part1.count())
-    part1.explain()
-    val part2 = featurized_df.filter(col("state") === 8) //.coalesce(200).cache()
-    println(part2.count())
-    part2.explain()
-    calculateApproxSimilarityJoin2(mh,part1,part2,0.1)
+    //get distinct states
+    //val states = Map((39,List(8,21)),(8,List(21))).par //featurized_df.select("state").distinct().as[Long].rdd.collect().toList.combinations(2).toList.par
+    val states = featurized_df.select("state").distinct().as[Long].rdd.collect().toList.combinations(2).toList.par
+    val state_pairs_results = states.foreach(pair => calculateFor2States(mh,pair,featurized_df,0.5))
+
+    //calculateApproxSimilarityJoins2(mh,states,featurized_df,0.6)
 
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
  
     spark.stop()
   }
+
 }
