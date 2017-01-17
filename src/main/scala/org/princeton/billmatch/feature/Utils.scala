@@ -158,13 +158,7 @@ object Utils {
     LinalgUtils.transposeRowMatrix(reconstructed)
   }
 
-  def appendFeature(a: WrappedArray[String], b: WrappedArray[String]) : WrappedArray[String] = {
-     a ++ b
-  }
-
   def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
-
-  def appendFeature_udf = udf(appendFeature _)
 
   def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int) : DataFrame = {
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
