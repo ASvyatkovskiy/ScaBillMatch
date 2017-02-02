@@ -66,16 +66,24 @@ object AnalysisUtils {
     if (isAscending) {
        sorted = processed_data.filter(processed_data("similarity") <= threshold)
     }
-    println(sorted.count())
+    
     val j1 = sorted.join(raw_bills.withColumnRenamed("content","content1"),$"pk1" === $"primary_key").select("pk1","pk2","content1","similarity")
     val j2 = j1.join(raw_bills.withColumnRenamed("content","content2"),$"pk2" === $"primary_key").select("pk1","pk2","content1","content2","similarity")
 
-    val fraction: Double = numRows.toDouble/sorted.count()
-    println(fraction)
-    if (isAscending) {
-      j2.sample(false,fraction).sort(asc("similarity"))
+    var fraction: Double = numRows.toDouble/sorted.count()
+    if (fraction < 1.0) {
+      if (isAscending) {
+        j2.sample(false,fraction).sort(asc("similarity"))
+      } else {
+        j2.sample(false,fraction).sort(desc("similarity"))
+      }
     } else {
-      j2.sample(false,fraction).sort(desc("similarity"))
+      println("The dataset fraction exceeds 1.0, returning the whole dataset above similarity threshold") 
+      if (isAscending) {
+        j2.sort(asc("similarity"))
+      } else {
+        j2.sort(desc("similarity"))
+      }      
     }
   }
 
