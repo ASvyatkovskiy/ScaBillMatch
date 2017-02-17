@@ -41,7 +41,7 @@ object AnalysisUtils {
 
     var raw_bills = spark.read.json(raw_input_filename).filter(col("docversion") === "Introduced")
     raw_bills = raw_bills.withColumn("content",Utils.cleaner_udf(col("content")))
-    val processed_data = spark.sparkContext.objectFile[Tuple2[Tuple2[String,String],Double]](processed_input_filename).map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").cache()
+    val processed_data = spark.read.parquet(processed_input_filename).cache()
     var sorted = processed_data.sort(desc("similarity")).limit(numRows)
     if (isAscending) {
        sorted = processed_data.sort(asc("similarity")).limit(numRows)
@@ -61,7 +61,7 @@ object AnalysisUtils {
 
     var raw_bills = spark.read.json(raw_input_filename).filter(col("docversion") === "Introduced")
     raw_bills = raw_bills.withColumn("content",Utils.cleaner_udf(col("content")))
-    val processed_data = spark.sparkContext.objectFile[Tuple2[Tuple2[String,String],Double]](processed_input_filename).map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").cache()
+    val processed_data = spark.read.parquet(processed_input_filename).cache()
     var sorted = processed_data.filter(processed_data("similarity") >= threshold)
     if (isAscending) {
        sorted = processed_data.filter(processed_data("similarity") <= threshold)
@@ -97,4 +97,25 @@ object AnalysisUtils {
     prefeaturized_df
 
   }
+
+  def takeLarger_udf = udf((pk1: String, pk2: String) => {
+        val state1 = pk1.split("_")(1)
+        val state2 = pk2.split("_")(1)
+
+        if (state1 > state2) pk1
+        else pk2
+    })
+
+  def takeSmaller_udf = udf((pk1: String, pk2: String) => {
+        val state1 = pk1.split("_")(1)
+        val state2 = pk2.split("_")(1)
+
+        if (state1 > state2) pk2
+        else pk1
+    })
+
+  def imposeTemporalOrder(df: DataFrame) : DataFrame = {
+     df.withColumn("pk1_smaller",takeSmaller_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLarger_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2"))
+  }
+
 }
