@@ -63,8 +63,7 @@ object LDAAnalyzer {
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content")) //.filter("docversion == Introduced")
     bills.explain
 
-    def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
-    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))).drop("content")
+    val cleaned_df = bills.withColumn("cleaned",Utils.cleaner_udf(col("content"))).drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
     var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")

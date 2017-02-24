@@ -75,19 +75,6 @@ object ExtractCandidates {
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
   }
 
-  def compactSelector_udf = udf((s: String) => {
-
-       val probe = s.toLowerCase()
-
-       val compactPattern = "compact".r
-       val isCompact = compactPattern.findFirstIn(probe).getOrElse("")
-
-       val uniformPattern = "uniform".r
-       val isUniform = uniformPattern.findFirstIn(probe).getOrElse("")
-
-       (isCompact.isEmpty() && isUniform.isEmpty())
-    })
-
   def run(params: Config) {
 
     val spark = SparkSession.builder().appName("ExtractCandidates")
@@ -107,7 +94,7 @@ object ExtractCandidates {
     val useLSA = params.getBoolean("makeCartesian.useLSA")
     val kval = params.getInt("makeCartesian.kval")
 
-    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(compactSelector_udf(col("content")))
+    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content")))
     input.printSchema()
     input.show()
 
@@ -115,8 +102,7 @@ object ExtractCandidates {
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
     bills.explain
 
-    var rescaled_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity)
-    rescaled_df = rescaled_df.cache()
+    var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity).cache()
 
     val clusters_schema = StructType(Seq(StructField("primary_key",StringType,false),StructField("docversion",StringType, false),StructField("docid",StringType,false),StructField("state",LongType,false),StructField("year",LongType,false),StructField("features", VectorType, false),StructField("prediction",LongType,false)))
     var clusters_df: DataFrame = spark.createDataFrame(spark.sparkContext.emptyRDD[Row], clusters_schema)
@@ -124,35 +110,35 @@ object ExtractCandidates {
     if (useLSA) {
         //Apply low-rank matrix factorization via SVD approach, truncate to reduce the dimensionality
 
-        val dataPart2 = rescaled_df.select("primary_key","docversion","docid","state","year").as[(String,String,String,Long,Long)].rdd.zipWithIndex().map(x => (x._1._1,x._1._2,x._1._3,x._1._4,x._1._5,x._2)).toDF("primary_key","docversion","docid","state","year","id")
+        val dataPart2 = features_df.select("primary_key","docversion","docid","state","year").as[(String,String,String,Long,Long)].rdd.zipWithIndex().map(x => (x._1._1,x._1._2,x._1._3,x._1._4,x._1._5,x._2)).toDF("primary_key","docversion","docid","state","year","id")
 
-        val dataRDD = rescaled_df.select("features").rdd.map {
+        val dataRDD = features_df.select("features").rdd.map {
               case Row(v: NewVector) => OldVectors.fromML(v)}.cache()
         //.as[org.apache.spark.ml.linalg.Vector].rdd.map(x => Utils.toOld(x)).cache()
 
         // Compute the top 5 singular values and corresponding singular vectors.
         //320 concepts worked perfectly for 10 states
         val numConcepts = params.getInt("makeCartesian.numConcepts")
-        rescaled_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts)
-        rescaled_df.show()
-        rescaled_df.printSchema
-        //assert(dataPart2.count() == rescaled_df.count())
+        features_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts)
+        features_df.show()
+        features_df.printSchema
+        assert(dataPart2.count() == features_df.count())
 
-        clusters_df = Utils.KMeansSuite(rescaled_df,kval)
+        clusters_df = Utils.KMeansSuite(features_df,kval)
 
         //Setup for splitting by cluster on the step2
         val dataPart1 = clusters_df.select("prediction","features").rdd.map(row => Utils.converter(row.toSeq)).zipWithIndex().map(x => (x._1._1,x._1._2,x._2)).toDF("prediction","features","id")
         //val dataPart1 = clusters_df.select("prediction").withColumn("id",monotonicallyIncreasingId)
 
         clusters_df = dataPart1.join(dataPart2, dataPart2("id") === dataPart1("id"))
-        //assert(dataPart1.count() == clusters_df.count())
+        assert(dataPart1.count() == clusters_df.count())
 
         clusters_df.printSchema()
         clusters_df.show()
         dataPart1.unpersist()
         dataPart2.unpersist()
     } else {
-        clusters_df = Utils.KMeansSuite(rescaled_df,kval)
+        clusters_df = Utils.KMeansSuite(features_df,kval)
     }
  
     clusters_df.select("primary_key","docversion","docid","state","year","prediction","features").write.parquet(params.getString("makeCartesian.outputParquetFile"))
@@ -162,7 +148,6 @@ object ExtractCandidates {
 
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
 
-    //will be array of tuples, but the keys are unique
     var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("makeCartesian.nPartitions"))
                           .map(x => Utils.pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
                           .filter({case (dd,ll) => (ll.length > 0)})

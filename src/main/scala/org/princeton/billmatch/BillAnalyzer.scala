@@ -47,10 +47,6 @@ object BillAnalyzer {
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
   }
 
-  def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
-
-  def appendFeature_udf = udf(Utils.appendFeature _)
-
   def run(params: Config) {
 
     val spark = SparkSession
@@ -98,7 +94,7 @@ object BillAnalyzer {
 
     val firstjoin = Utils.twoSidedJoin(cartesian_pairs,hashed_bills)
     val matches = firstjoin.mapValues({case (v1,v2) => similarityMeasure.compute(v1,v2)}).filter({case (k,v) => (v > threshold)})
-    matches.saveAsObjectFile(params.getString("billAnalyzer.outputMainFile"))
+    matches.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").write.parquet(params.getString("billAnalyzer.outputMainFile"))
 
     spark.stop()
    }
