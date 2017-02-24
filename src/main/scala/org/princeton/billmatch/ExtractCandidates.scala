@@ -122,7 +122,6 @@ object ExtractCandidates {
         features_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts)
         features_df.show()
         features_df.printSchema
-        assert(dataPart2.count() == features_df.count())
 
         clusters_df = Utils.KMeansSuite(features_df,kval)
 
@@ -131,7 +130,6 @@ object ExtractCandidates {
         //val dataPart1 = clusters_df.select("prediction").withColumn("id",monotonicallyIncreasingId)
 
         clusters_df = dataPart1.join(dataPart2, dataPart2("id") === dataPart1("id"))
-        assert(dataPart1.count() == clusters_df.count())
 
         clusters_df.printSchema()
         clusters_df.show()
