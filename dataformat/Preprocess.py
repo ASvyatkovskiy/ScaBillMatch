@@ -69,7 +69,8 @@ us_state_abbrev = {
     'WA':46,
     'WV':47,
     'WI':48,
-    'WY':49
+    'WY':49,
+    'FD':50
 }
 
 states = {
@@ -129,7 +130,8 @@ states = {
         'WA': 'Washington',
         'WI': 'Wisconsin',
         'WV': 'WestVirginia',
-        'WY': 'Wyoming'
+        'WY': 'Wyoming',
+        'FD': 'Federal'
 }
 
 class Preprocess(object):
