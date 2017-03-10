@@ -168,7 +168,9 @@ class Preprocess(object):
                     version = "".join(version.split())
                     output_dict['docversion'] = version
                     output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
-                    output_dict['content'] = content.decode("utf-8",errors='replace')
+                    content = content.decode("utf-8",errors='replace')
+                    content = content.rpartition('TEXT: ')[-1]
+                    output_dict['content'] = content.partition('SPONSOR: ')[0]
                     if self.exclude_uniforms:
                         if output_dict['primary_key'] not in uniforms: self.output_dicts.append(output_dict)
                     else:
@@ -235,6 +237,6 @@ class Preprocess(object):
 
 if __name__=='__main__':
     #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_10states/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_10.json",True,True)
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_3states_partitioned/partition_*","/scratch/network/alexeys/bills/lexs/bills_combined_3_test.json",True,True)
+    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_51.json",True,True)
     preprocessor.fillStructures()
     preprocessor.saveStructures()
