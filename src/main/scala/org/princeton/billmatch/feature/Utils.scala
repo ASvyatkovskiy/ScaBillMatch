@@ -193,10 +193,10 @@ object Utils {
     idfModel.transform(featurized_df).drop("rawFeatures").drop("content")
   }
 
-  def converter(row: scala.collection.Seq[Any]) : (Int,NewVector) = {
+  def converter(row: scala.collection.Seq[Any]) : (Int,NewSparseVector) = {
     val ret = row.asInstanceOf[WrappedArray[Any]]
     val first = ret(0).asInstanceOf[Int]
-    val second = ret(1).asInstanceOf[NewVector]
+    val second = ret(1).asInstanceOf[NewSparseVector]
     (first,second)
   }
 
@@ -224,4 +224,11 @@ object Utils {
        (isCompact.isEmpty() && isUniform.isEmpty())
     })
 
+
+  def lengthSelector_udf = udf((s: String) => {
+
+       val isLongEnough = s.length > 500
+
+       isLongEnough
+    })
 }
