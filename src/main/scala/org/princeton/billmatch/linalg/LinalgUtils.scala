@@ -45,7 +45,7 @@ object LinalgUtils {
 
   def toNew(v: OldVector): NewVector = v match {
     case sv: OldSparseVector => NewVectors.sparse(sv.size, sv.indices, sv.values)
-    case dv: OldDenseVector => NewVectors.dense(dv.values)
+    case dv: OldDenseVector => NewVectors.dense(dv.values).toSparse
   }
 
   //Calculate submatrix containing nColsToKeep of inital matrix A. This is used for truncating the V.T matrix in SVD 
