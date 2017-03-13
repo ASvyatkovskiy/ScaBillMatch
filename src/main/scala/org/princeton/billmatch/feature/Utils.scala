@@ -52,6 +52,7 @@ object Utils {
     val idocid = document.docid
     val pk1 = document.primary_key
     val label1 = document.prediction
+    val length1 = document.length
 
     var output_arr: ArrayBuffer[CartesianPair] = new ArrayBuffer[CartesianPair]()
 
@@ -61,10 +62,12 @@ object Utils {
        val jyear = jevent.year
        val pk2 = jevent.primary_key
        val label2 = jevent.prediction
+       val length2 = jevent.length
+
        if (use_strict) {
          //extra condition
          if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
-           if (pk1 < pk2 && label1 == label2 && istate != jstate) {
+           if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2) < 5000) {
               var output: CartesianPair = CartesianPair(pk1,pk2)
               output_arr += output
            }
@@ -72,13 +75,13 @@ object Utils {
        } else {
           //simple condition
           if (onlyInOut) {
-             if (pk1 < pk2 && label1 == label2 && istate != jstate) {
+             if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2) < 5000) {
                 var output: CartesianPair = CartesianPair(pk1,pk2)
                 output_arr += output
              }
            } else {
              //in-out and in-in
-             if (pk1 < pk2 && label1 == label2) {
+             if (pk1 < pk2 && label1 == label2 && Math.abs(length1-length2) < 5000) {
                 var output: CartesianPair = CartesianPair(pk1,pk2)
                 output_arr += output
              }
