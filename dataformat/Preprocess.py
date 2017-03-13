@@ -160,7 +160,7 @@ class Preprocess(object):
                         print "Tokenization issue in file: ", input
                         break
  
-                    output_dict = {'content':None, 'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':''}
+                    output_dict = {'content':None, 'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':'','length':0}
                     output_dict['year'] = int(year)
                     output_dict['state'] = us_state_abbrev[state]
                     output_dict['docid'] = docid
@@ -171,6 +171,7 @@ class Preprocess(object):
                     content = content.decode("utf-8",errors='replace')
                     content = content.rpartition('TEXT: ')[-1]
                     output_dict['content'] = content.partition('SPONSOR: ')[0]
+                    output_dict['length'] = len(output_dict['content'])
                     if self.exclude_uniforms:
                         if output_dict['primary_key'] not in uniforms: self.output_dicts.append(output_dict)
                     else:
