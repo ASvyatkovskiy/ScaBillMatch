@@ -67,7 +67,7 @@ object Utils {
        if (use_strict) {
          //extra condition
          if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
-           if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2) < 5000) {
+           if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) {
               var output: CartesianPair = CartesianPair(pk1,pk2)
               output_arr += output
            }
@@ -75,13 +75,13 @@ object Utils {
        } else {
           //simple condition
           if (onlyInOut) {
-             if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2) < 5000) {
+             if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) {
                 var output: CartesianPair = CartesianPair(pk1,pk2)
                 output_arr += output
              }
            } else {
              //in-out and in-in
-             if (pk1 < pk2 && label1 == label2 && Math.abs(length1-length2) < 5000) {
+             if (pk1 < pk2 && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) {
                 var output: CartesianPair = CartesianPair(pk1,pk2)
                 output_arr += output
              }
@@ -180,9 +180,9 @@ object Utils {
        val ngram_df = ngram.transform(prefeaturized_df)
 
        //prefeaturized_df = ngram_df.withColumn("combined", appendFeature_udf(col("filtered"),col("ngram"))).drop("filtered").drop("ngram").drop("cleaned")
-       prefeaturized_df = ngram_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("ngram").alias("combined"))
+       prefeaturized_df = ngram_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("length"),col("ngram").alias("combined"))
     } else {
-       prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("filtered").alias("combined"))
+       prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("length"),col("filtered").alias("combined"))
        prefeaturized_df.printSchema()
     }
 
