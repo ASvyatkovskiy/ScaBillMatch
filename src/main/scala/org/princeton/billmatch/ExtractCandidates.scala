@@ -80,7 +80,7 @@ object ExtractCandidates {
     val spark = SparkSession.builder().appName("ExtractCandidates")
       //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
-      .config("spark.shuffle.memoryFraction","0.6")
+      .config("spark.shuffle.memoryFraction","0.7")
       .config("spark.sql.codegen.wholeStage", "true")
       .config("spark.driver.maxResultSize", "10g")
       .getOrCreate()
@@ -94,7 +94,7 @@ object ExtractCandidates {
     val useLSA = params.getBoolean("makeCartesian.useLSA")
     val kval = params.getInt("makeCartesian.kval")
 
-    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content")))
+    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
     input.printSchema()
     input.show()
 
@@ -104,13 +104,13 @@ object ExtractCandidates {
 
     var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity).cache()
 
-    val clusters_schema = StructType(Seq(StructField("primary_key",StringType,false),StructField("docversion",StringType, false),StructField("docid",StringType,false),StructField("state",LongType,false),StructField("year",LongType,false),StructField("features", VectorType, false),StructField("prediction",LongType,false)))
+    val clusters_schema = StructType(Seq(StructField("primary_key",StringType,false),StructField("docversion",StringType, false),StructField("docid",StringType,false),StructField("state",LongType,false),StructField("year",LongType,false),StructField("length",LongType,false),StructField("features", VectorType, false),StructField("prediction",LongType,false)))
     var clusters_df: DataFrame = spark.createDataFrame(spark.sparkContext.emptyRDD[Row], clusters_schema)
 
     if (useLSA) {
         //Apply low-rank matrix factorization via SVD approach, truncate to reduce the dimensionality
 
-        val dataPart2 = features_df.select("primary_key","docversion","docid","state","year").as[(String,String,String,Long,Long)].rdd.zipWithIndex().map(x => (x._1._1,x._1._2,x._1._3,x._1._4,x._1._5,x._2)).toDF("primary_key","docversion","docid","state","year","id")
+        val dataPart2 = features_df.select("primary_key","docversion","docid","state","year","length").as[(String,String,String,Long,Long,Long)].rdd.zipWithIndex().map(x => (x._1._1,x._1._2,x._1._3,x._1._4,x._1._5,x._1._6,x._2)).toDF("primary_key","docversion","docid","state","year","length","id")
 
         val dataRDD = features_df.select("features").rdd.map {
               case Row(v: NewVector) => OldVectors.fromML(v)}.cache()
@@ -119,7 +119,7 @@ object ExtractCandidates {
         // Compute the top 5 singular values and corresponding singular vectors.
         //320 concepts worked perfectly for 10 states
         val numConcepts = params.getInt("makeCartesian.numConcepts")
-        features_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts)
+        features_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts*2)
         features_df.show()
         features_df.printSchema
 
@@ -139,9 +139,9 @@ object ExtractCandidates {
         clusters_df = Utils.KMeansSuite(features_df,kval)
     }
  
-    clusters_df.select("primary_key","docversion","docid","state","year","prediction","features").write.parquet(params.getString("makeCartesian.outputParquetFile"))
+    clusters_df.select("primary_key","docversion","docid","state","year","prediction","length","features").write.parquet(params.getString("makeCartesian.outputParquetFile"))
 
-    var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction").as[MetaLabeledDocument].cache()
+    var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].cache()
     var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
 
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
@@ -156,5 +156,5 @@ object ExtractCandidates {
    }
 }
 
-case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long)
+case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long, length: Long)
 case class CartesianPair(pk1: String, pk2: String)
