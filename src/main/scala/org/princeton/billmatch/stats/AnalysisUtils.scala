@@ -67,7 +67,8 @@ object AnalysisUtils {
     val raw_bills = input.withColumn("content",Utils.cleaner_udf(col("content"))).cache()
 
     val processed_data = spark.read.parquet(processed_input_filename)
-    val sorted = if (isAscending) processed_data.sort(asc("similarity")).limit(numRows) else processed_data.sort(desc("similarity")).limit(numRows)
+    
+    val sorted = if(isAscending) processed_data.filter(processed_data("similarity") <= threshold) else processed_data.filter(processed_data("similarity") >= threshold)
     val sorted_dataset = sorted.as[ComparedPair].repartition(npartitions).cache()
     
     val j1 = sorted_dataset.join(raw_bills.withColumnRenamed("content","content1"),$"pk1" === $"primary_key").select("pk1","pk2","content1","similarity")
@@ -101,7 +102,7 @@ object AnalysisUtils {
 
   }
 
-  def takeLarger_udf = udf((pk1: String, pk2: String) => {
+  def takeLargerPk_udf = udf((pk1: String, pk2: String) => {
         val state1 = pk1.split("_")(1)
         val state2 = pk2.split("_")(1)
 
@@ -109,7 +110,7 @@ object AnalysisUtils {
         else pk2
     })
 
-  def takeSmaller_udf = udf((pk1: String, pk2: String) => {
+  def takeSmallerPk_udf = udf((pk1: String, pk2: String) => {
         val state1 = pk1.split("_")(1)
         val state2 = pk2.split("_")(1)
 
@@ -117,8 +118,25 @@ object AnalysisUtils {
         else pk1
     })
 
+  def takeSmallerContent_udf = udf((pk1: String, pk2: String,content1: String, content2: String) => {
+        val state1 = pk1.split("_")(1)
+        val state2 = pk2.split("_")(1)
+
+        if (state1 > state2) content2
+        else content1
+    })
+
+  def takeLargerContent_udf = udf((pk1: String, pk2: String,content1: String, content2: String) => {
+        val state1 = pk1.split("_")(1)
+        val state2 = pk2.split("_")(1)
+
+        if (state1 > state2) content1
+        else content2
+    })
+
+
   def imposeTemporalOrder(df: DataFrame) : DataFrame = {
-     df.withColumn("pk1_smaller",takeSmaller_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLarger_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2"))
+     df.withColumn("content1_smaller",takeSmallerContent_udf(col("pk1"),col("pk2"),col("content1"),col("content2"))).withColumn("content2_larger",takeLargerContent_udf(col("pk1"),col("pk2"),col("content1"),col("content2"))).withColumn("pk1_smaller",takeSmallerPk_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLargerPk_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2")).drop(col("content1")).drop(col("content2"))
   }
 
 }
