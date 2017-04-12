@@ -80,6 +80,7 @@ object Utils {
                  var output: CartesianPair = CartesianPair(pk1,pk2)
                  output_arr += output
              }  
+             case _ =>
            }
          } 
        } else {
@@ -102,6 +103,7 @@ object Utils {
                    var output: CartesianPair = CartesianPair(pk1,pk2)
                    output_arr += output
                }   
+               case _ =>
              }  
            } else {
              //in-out and in-in
@@ -122,6 +124,7 @@ object Utils {
                    var output: CartesianPair = CartesianPair(pk1,pk2)
                    output_arr += output
                }   
+               case _ =>
              }  
            } 
         }
