@@ -147,7 +147,7 @@ object ExtractCandidates {
     val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
 
     var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("makeCartesian.nPartitions"))
-                          .map(x => Utils.pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut")))
+                          .map(x => Utils.pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut"),params.getBoolean("makeCartesian.optimizationLevel")))
                           .filter({case (dd,ll) => (ll.length > 0)})
                           .map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
