@@ -86,10 +86,6 @@ object Utils {
        } else {
             //simple condition
             if (onlyInOut) {
-             //if (pk1 < pk2 && label1 == label2 && istate != jstate && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) {
-             //   var output: CartesianPair = CartesianPair(pk1,pk2)
-             //   output_arr += output
-             //}
              optimize match {
                case 0 if (pk1 < pk2 && istate != jstate) => {
                    var output: CartesianPair = CartesianPair(pk1,pk2)
@@ -107,10 +103,6 @@ object Utils {
              }  
            } else {
              //in-out and in-in
-             //if (pk1 < pk2 && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) {
-             //   var output: CartesianPair = CartesianPair(pk1,pk2)
-             //   output_arr += output
-             //}
              optimize match {
                case 0 if (pk1 < pk2 && istate != jstate) => {
                    var output: CartesianPair = CartesianPair(pk1,pk2)
