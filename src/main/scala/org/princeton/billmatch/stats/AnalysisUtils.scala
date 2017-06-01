@@ -137,7 +137,7 @@ object AnalysisUtils {
 
   def imposeTemporalOrder(df: DataFrame) : DataFrame = {
      val columns = df.schema.fields.map(x=>x.name)
-     if columns contains "content" {
+     if (columns contains "content") {
          df.withColumn("content1_smaller",takeSmallerContent_udf(col("pk1"),col("pk2"),col("content1"),col("content2"))).withColumn("content2_larger",takeLargerContent_udf(col("pk1"),col("pk2"),col("content1"),col("content2"))).withColumn("pk1_smaller",takeSmallerPk_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLargerPk_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2")).drop(col("content1")).drop(col("content2"))
      } else {
          df.withColumn("pk1_smaller",takeSmallerPk_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLargerPk_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2"))
