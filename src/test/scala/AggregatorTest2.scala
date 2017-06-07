@@ -17,17 +17,17 @@ import org.princeton.billmatch._
 
 object AggregatorTest2 {
 
-  class SeqAgg(private val similarityMeasure: SimilarityMeasure) extends Aggregator[AggDocument, Seq[(String,Long,Vector)], Seq[(String,String,Double)]] {
+  class SeqAgg(private val similarityMeasure: SimilarityMeasure) extends Aggregator[AggDocument, Seq[(String,Long,Vector)], Seq[(String,String,Float)]] {
      def zero: Seq[(String,Long,Vector)] = Nil //this should have a type of merge buffer
      def reduce(b: Seq[(String,Long,Vector)], a: AggDocument): Seq[(String,Long,Vector)] = (a.primary_key,a.state,a.features) +: b
      def merge(b1: Seq[(String,Long,Vector)], b2: Seq[(String,Long,Vector)]): Seq[(String,Long,Vector)] = b1 ++ b2
-     def finish(r: Seq[(String,Long,Vector)]): Seq[(String,String,Double)] = { 
+     def finish(r: Seq[(String,Long,Vector)]): Seq[(String,String,Float)] = { 
          val buffy = r.combinations(2).filter{case Seq(x,y) => (x._2 != y._2)}.map{case Seq(x,y) => (x._1,y._1,similarityMeasure.compute(x._3.toSparse,y._3.toSparse))}.filter{case (x,y,z) => (z > 70.0)}.toIndexedSeq
          //println(buffy.length)
          buffy
      }
      override def bufferEncoder: Encoder[Seq[(String,Long,Vector)]] = ExpressionEncoder()
-     override def outputEncoder: Encoder[Seq[(String,String,Double)]] = ExpressionEncoder()
+     override def outputEncoder: Encoder[Seq[(String,String,Float)]] = ExpressionEncoder()
   }
 
   def main (args: Array[String]) {
