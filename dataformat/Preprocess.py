@@ -169,7 +169,10 @@ class Preprocess(object):
                     output_dict['docversion'] = version
                     output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
                     content = content.decode("utf-8",errors='replace')
-                    content = content.rpartition('TEXT: ')[-1]
+                    if state != "FD":
+                        content = content.rpartition('TEXT: ')[-1]
+                    else:
+                        content = content.rpartition('SECTION 1.')[-1]
                     output_dict['content'] = content.partition('SPONSOR: ')[0]
                     output_dict['length'] = len(output_dict['content'])
                     if self.exclude_uniforms:
@@ -237,7 +240,7 @@ class Preprocess(object):
 
 
 if __name__=='__main__':
-    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_10states/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_10.json",True,True)
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_51.json",True,True)
+    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p1_fed.json",True,True)
+    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_3states2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_3_CAFLVA.json",True,True)
     preprocessor.fillStructures()
     preprocessor.saveStructures()
