@@ -146,7 +146,7 @@ object MinHashLSHExample {
     val featurized_df = hashingTF.transform(ngram_df).select("keys","primary_key","state")
     featurized_df.show()
 
-    val mh = new MinHashLSH().setNumHashTables(10)
+    val mh = new MinHashLSH().setNumHashTables(20)
       .setInputCol("keys")
       .setOutputCol("values")
       .setSeed(12345)
