@@ -75,7 +75,7 @@ final object HammingSimilarity extends SimilarityMeasure {
 }
 
 
-final object defaultJaccardSimilarity extends SimilarityMeasure {
+final object JaccardSimilarity extends SimilarityMeasure {
 
   /**
    * Compute Jaccard similarity between vectors
@@ -94,19 +94,22 @@ final object defaultJaccardSimilarity extends SimilarityMeasure {
   }
 }
 
-final object JaccardSimilarity extends SimilarityMeasure {
+final object weightedJaccardSimilarity extends SimilarityMeasure {
 
   def compute(v1: Vector, v2: Vector): Float = {
     val indices1 = v1.toSparse.indices.toSet
     val indices2 = v2.toSparse.indices.toSet
+    val intersection = indices1.intersect(indices2).size.toFloat
+
     val xsize = indices1.size
     val ysize = indices2.size
 
     val relative = Math.abs(xsize-ysize).asInstanceOf[Float]/math.sqrt(xsize*ysize)
     val similarity: Float = relative match {
-       case relative if relative > 3.0 => {
-         val alpha: Float = math.min(xsize,ysize).toFloat/math.max(xsize,ysize).toFloat
-         val r: Float = indices1.intersect(indices2).size.toFloat/Math.min(xsize,ysize)
+       case relative if relative > 5.0 => {
+         val m = Math.min(xsize,ysize).toFloat
+         val alpha: Float = m/math.max(xsize,ysize).toFloat
+         val r: Float = intersection/m
          val weight: Float = ((1.0-r)*(1.0+alpha)/(1.0+r)/(1.0+alpha-2.0*alpha*r)).toFloat
 
          val b1 = LinalgShim.asBreeze(v1)
@@ -114,7 +117,10 @@ final object JaccardSimilarity extends SimilarityMeasure {
 
          (100.0*(Vectors.norm(v1,1) + Vectors.norm(v2,1) - weight*norm(b1-b2,1.0))/(Vectors.norm(v1,1) + Vectors.norm(v2,1) + weight*norm(b1-b2,1.0))).toFloat
        }
-       case _ => defaultJaccardSimilarity.compute(v1,v2)
+       case _ => {
+         val union = indices1.size+indices2.size-intersection
+         (intersection/union*100.0).toFloat
+       }
     }
     similarity
   }
