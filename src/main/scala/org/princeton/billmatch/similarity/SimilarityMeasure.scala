@@ -94,6 +94,22 @@ final object JaccardSimilarity extends SimilarityMeasure {
   }
 }
 
+final object MaxAsymJaccardSimilarity extends SimilarityMeasure {
+
+  /**
+   * Max Jaccard distance: for the case of lopsided documents,
+   * the intersection will often be small as compared to union (dominated by the larger document)
+   * For this case, consider smaller set (document) size in the denominator
+   */
+  def compute(v1: Vector, v2: Vector): Float = {
+    val indices1 = v1.toSparse.indices.toSet
+    val indices2 = v2.toSparse.indices.toSet
+    val intersection = indices1.intersect(indices2).size.toFloat
+    val denom = math.min(indices1.size,indices2.size)
+    (intersection/denom*100.0).toFloat
+  }
+}
+
 final object weightedJaccardSimilarity extends SimilarityMeasure {
 
   def compute(v1: Vector, v2: Vector): Float = {
