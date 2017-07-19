@@ -86,6 +86,18 @@ object BillAnalyzer {
         similarityMeasure = JaccardSimilarity
         threshold = -20.0
       }
+      case "maxasymjaccard" => {
+        similarityMeasure = MaxAsymJaccardSimilarity
+        threshold = -20.0
+      }
+      case "left_jaccard" => {
+        similarityMeasure = LeftJaccardSimilarity
+        threshold = -20.0
+      }
+      case "right_jaccard" => {
+        similarityMeasure = RightJaccardSimilarity
+        threshold = -20.0
+      }
       case "weighted_jaccard" => {
         similarityMeasure = weightedJaccardSimilarity
         threshold = -20.0
