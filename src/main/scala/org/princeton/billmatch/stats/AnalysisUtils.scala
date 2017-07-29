@@ -36,20 +36,29 @@ import org.princeton.billmatch.feature._
 
 object AnalysisUtils {
 
-  def sampleNOrdered(spark: SparkSession, raw_input_filename: String, processed_input_filename: String, numRows: Int, isAscending: Boolean) : DataFrame = {  
+  def sampleNOrdered(spark: SparkSession, raw_input_filename: String, processed_input_filename: String, numRows: Int, isAscending: Boolean, makeLight: Boolean) : DataFrame = {  
     import spark.implicits._
 
     val input = spark.read.json(raw_input_filename).filter(col("docversion") === "Introduced")
     val npartitions = (input.count()/1000).toInt
 
-    val raw_bills = input.withColumn("content",Utils.cleaner_udf(col("content"))).cache()
+    val raw_bills = if (makeLight) input.drop("content").cache() else input.withColumn("content",Utils.cleaner_udf(col("content"))).cache()
 
     val processed_data = spark.read.parquet(processed_input_filename)
-    val sorted = if (isAscending) processed_data.sort(asc("similarity")).limit(numRows) else processed_data.sort(desc("similarity")).limit(numRows)
-    val sorted_dataset = sorted.as[ComparedPair].repartition(npartitions).cache()
+    val sorted = isAscending match {
+        case true if numRows >= 0 => {processed_data.sort(asc("similarity")).limit(numRows)}
+        case true if numRows < 0 => {processed_data.sort(asc("similarity"))}
+        case false if numRows >= 0 => {processed_data.sort(desc("similarity")).limit(numRows)}
+        case false if numRows < 0 => {processed_data.sort(desc("similarity"))}
+        case other: Any =>
+          throw new IllegalArgumentException(
+            s"Only hamming, cosine, euclidean, manhattan, and jaccard similarities are supported but got $other."
+        )
+    }
+    val sorted_dataset = if (makeLight) sorted.repartition(npartitions).cache() else sorted.as[ComparedPair].repartition(npartitions).cache()
 
-    val j1 = sorted_dataset.join(raw_bills.withColumnRenamed("content","content1"),$"pk1" === $"primary_key").select("pk1","pk2","content1","similarity")
-    val j2 = j1.join(raw_bills.withColumnRenamed("content","content2"),$"pk2" === $"primary_key").select("pk1","pk2","content1","content2","similarity") //.write.parquet("/user/path/to/output")
+    val j1 = if (makeLight) sorted_dataset.join(raw_bills,$"pk1" === $"primary_key").select("pk1","pk2","similarity") else sorted_dataset.join(raw_bills.withColumnRenamed("content","content1"),$"pk1" === $"primary_key").select("pk1","pk2","content1","similarity")
+    val j2 = if (makeLight) j1.join(raw_bills,$"pk2" === $"primary_key").select("pk1","pk2","similarity") else j1.join(raw_bills.withColumnRenamed("content","content2"),$"pk2" === $"primary_key").select("pk1","pk2","content1","content2","similarity") //.write.parquet("/user/path/to/output")
     //to sort by similarity do
     if (isAscending) {
       j2.sort(asc("similarity"))
@@ -137,7 +146,7 @@ object AnalysisUtils {
 
   def imposeTemporalOrder(df: DataFrame) : DataFrame = {
      val columns = df.schema.fields.map(x=>x.name)
-     if (columns contains "content") {
+     if (columns contains "content1") {
          df.withColumn("content1_smaller",takeSmallerContent_udf(col("pk1"),col("pk2"),col("content1"),col("content2"))).withColumn("content2_larger",takeLargerContent_udf(col("pk1"),col("pk2"),col("content1"),col("content2"))).withColumn("pk1_smaller",takeSmallerPk_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLargerPk_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2")).drop(col("content1")).drop(col("content2"))
      } else {
          df.withColumn("pk1_smaller",takeSmallerPk_udf(col("pk1"),col("pk2"))).withColumn("pk2_larger",takeLargerPk_udf(col("pk1"),col("pk2"))).drop(col("pk1")).drop(col("pk2"))
