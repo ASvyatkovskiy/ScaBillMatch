@@ -33,7 +33,7 @@ object LatestVersionExtracter {
 
   def rtrim(s: String) = s.replaceAll(",$", "")
 
-  def getTimestampString(s: String) : String => {
+  def getTimestampString(s: String) : String = {
     try { 
       Array(monthNameToNumber(s.split(" ")(0)),zeroPrefixed(rtrim(s.split(" ")(1))),s.split(" ")(2)).mkString("-"))
     } catch {
