@@ -1,19 +1,9 @@
 package org.princeton.billmatch
 
 import org.apache.spark.sql._
-import org.apache.spark.sql.expressions.Aggregator
-import org.apache.spark.sql.{Encoder, Encoders}
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-
-import scala.collection.mutable.WrappedArray
-
-import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
-
-import java.io._
 
 object LatestVersionExtracter {
 
@@ -57,16 +47,7 @@ object LatestVersionExtracter {
    else if (sequence.contains("Substituted")) {return "Substituted"}
    else if (sequence.contains("Amended")) {return "Amended"}
    else if (sequence.contains("Reintroduced")) {return "Reintroduced"}
-   else {return sequence(0)}
-  }
-
-  class SeqAgg() extends Aggregator[(String,String), Seq[String], Seq[String]] {
-     def zero: Seq[String] = Nil //this should have a type of merge buffer
-     def reduce(b: Seq[String], a: (String,String)): Seq[String] = a._2 +: b
-     def merge(b1: Seq[String], b2: Seq[String]): Seq[String] = b1 ++ b2
-     def finish(reduction: Seq[String]): Seq[String] = reduction
-     override def bufferEncoder: Encoder[Seq[String]] = ExpressionEncoder()
-     override def outputEncoder: Encoder[Seq[String]] = ExpressionEncoder() 
+   else {return sequence.last}
   }
 
   def main (args: Array[String]) {
@@ -83,18 +64,16 @@ object LatestVersionExtracter {
     val data = spark.read.json("/user/alexeys/metadata/metNJ.json").select("filePath","versionDate","version").as[Metadata]
     val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
 
-    val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version").as[(String,String)]
+    val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version","timestamp").as[(String,String,java.sql.Timestamp)]
 
     val myAgg = new SeqAgg()
-    val results = ready_to_join.groupByKey(_._1).agg(myAgg.toColumn).map{case (x,y) => (x,getLatest(y))}
-
-    results.printSchema()
+    val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.toDF("pk","latest")
     results.show(40,false)
 
     //for (d <- results.take(10)) {
     //    println(d)
     //}
-    //results.write.parquet("/user/alexeys/new_3_state_test") 
+    results.write.parquet("/user/alexeys/latest") 
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
 
