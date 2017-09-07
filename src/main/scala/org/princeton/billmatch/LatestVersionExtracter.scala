@@ -33,7 +33,15 @@ object LatestVersionExtracter {
 
   def rtrim(s: String) = s.replaceAll(",$", "")
 
-  def getTimestampString = udf((s: String) => Array(monthNameToNumber(s.split(" ")(0)),zeroPrefixed(rtrim(s.split(" ")(1))),s.split(" ")(2)).mkString("-"))
+  def getTimestampString(s: String) : String => {
+    try { 
+      Array(monthNameToNumber(s.split(" ")(0)),zeroPrefixed(rtrim(s.split(" ")(1))),s.split(" ")(2)).mkString("-"))
+    } catch {
+      case _ : Throwable => "December 31, 1900"
+    }
+  }
+
+  def getTimestampString_udf = udf(getTimestampString _)
 
   def getPK = udf((filePath: String, version: String) => Array(filePath.split("/")(1),filePath.split("/")(2),filePath.split("/")(3)).mkString("_"))
   def customPK = udf((primary_key: String) => primary_key.split("_").slice(0,3).mkString("_"))
@@ -61,18 +69,22 @@ object LatestVersionExtracter {
 
     import spark.implicits._
 
-    val data = spark.read.json("/user/alexeys/metadata/metNJ.json").select("filePath","versionDate","version").as[Metadata]
+    val data = spark.read.json("/user/alexeys/metadata/metNY.json").select("filePath","versionDate","version").as[Metadata]
     val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
-
     val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version","timestamp").as[(String,String,java.sql.Timestamp)]
 
     val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.toDF("pk","latest")
     results.show(40,false)
 
+
+    //get raw data in the current format
+    val raw = spark.read.json("file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json").withColumn("customPK",customPK(col("primary_key")))    
+    val output = raw.join(results,raw.col("customPK") === results.col("pk"))
+
     //for (d <- results.take(10)) {
     //    println(d)
     //}
-    results.write.parquet("/user/alexeys/latest") 
+    output.write.json("/user/alexeys/bills_combined_raw_with_latest_50p1p2") 
     val t1 = System.nanoTime()
     println("Elapsed time: " + (t1 - t0)/1000000000 + "s")
 
