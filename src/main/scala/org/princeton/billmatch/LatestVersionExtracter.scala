@@ -35,7 +35,7 @@ object LatestVersionExtracter {
 
   def getTimestampString(s: String) : String = {
     try { 
-      Array(monthNameToNumber(s.split(" ")(0)),zeroPrefixed(rtrim(s.split(" ")(1))),s.split(" ")(2)).mkString("-"))
+      Array(monthNameToNumber(s.split(" ")(0)),zeroPrefixed(rtrim(s.split(" ")(1))),s.split(" ")(2)).mkString("-")
     } catch {
       case _ : Throwable => "December 31, 1900"
     }
@@ -70,7 +70,7 @@ object LatestVersionExtracter {
     import spark.implicits._
 
     val data = spark.read.json("/user/alexeys/metadata/metNY.json").select("filePath","versionDate","version").as[Metadata]
-    val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
+    val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString_udf(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
     val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version","timestamp").as[(String,String,java.sql.Timestamp)]
 
     val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.toDF("pk","latest")
