@@ -31,7 +31,7 @@ import java.io._
 
 import org.apache.spark.rdd.RDD
 
-import org.scalatest.Assertions._
+//import org.scalatest.Assertions._
 
 import org.apache.spark.sql.DataFrame
 
