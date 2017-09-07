@@ -58,6 +58,19 @@ object LatestVersionExtracter {
    else {return sequence.last}
   }
 
+  def children(colnames: List[String], df: DataFrame) : Array[org.apache.spark.sql.Column] = {
+    colnames.map(x => child(x,df)).reduce(_ ++ _)
+  }
+
+  def child(colname: String, df: DataFrame) : Array[org.apache.spark.sql.Column] = {
+    val parent = df.schema.fields.filter(_.name == colname).head
+    val fields = parent.dataType match {
+      case x: StructType => x.fields
+      case _ => Array.empty[StructField]
+    }
+    fields.map(x => col(s"$colname.${x.name}"))
+  }
+
   def main (args: Array[String]) {
 
     val t0 = System.nanoTime()
@@ -72,15 +85,14 @@ object LatestVersionExtracter {
     val data = spark.read.json("/user/alexeys/metadata").select("filePath","versionDate","version").as[Metadata]
     val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString_udf(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
     val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version","timestamp").as[(String,String,java.sql.Timestamp)]
-
     val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.as[(String,String)]
     //results.show(40,false)
 
 
     //get raw data in the current format
     val raw = spark.read.json("file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json").withColumn("customPK",customPK(col("primary_key"))).as[RawFormat]
-    val output = raw.joinWith(results,raw.col("customPK") === results.col("_1"))
-    output.printSchema
+    var output = raw.joinWith(results,raw.col("customPK") === results.col("_1")).toDF()
+    output = output.select(children(List("_1","_2"), output): _*).select(col("content"),col("docid"),col("length"),col("primary_key"),col("state"),col("year"),col("_2").alias("docversion"))
     output.show()
 
     //for (d <- results.take(10)) {
