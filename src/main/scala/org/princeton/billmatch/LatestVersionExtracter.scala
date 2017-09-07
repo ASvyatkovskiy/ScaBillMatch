@@ -37,7 +37,7 @@ object LatestVersionExtracter {
     try { 
       Array(monthNameToNumber(s.split(" ")(0)),zeroPrefixed(rtrim(s.split(" ")(1))),s.split(" ")(2)).mkString("-")
     } catch {
-      case _ : Throwable => "December 31, 1900"
+      case _ : Throwable => "12-31-1900"
     }
   }
 
@@ -69,17 +69,19 @@ object LatestVersionExtracter {
 
     import spark.implicits._
 
-    val data = spark.read.json("/user/alexeys/metadata/metNY.json").select("filePath","versionDate","version").as[Metadata]
+    val data = spark.read.json("/user/alexeys/metadata").select("filePath","versionDate","version").as[Metadata]
     val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString_udf(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
     val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version","timestamp").as[(String,String,java.sql.Timestamp)]
 
-    val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.toDF("pk","latest")
-    results.show(40,false)
+    val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.as[(String,String)]
+    //results.show(40,false)
 
 
     //get raw data in the current format
-    val raw = spark.read.json("file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json").withColumn("customPK",customPK(col("primary_key")))    
-    val output = raw.join(results,raw.col("customPK") === results.col("pk"))
+    val raw = spark.read.json("file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json").withColumn("customPK",customPK(col("primary_key"))).as[RawFormat]
+    val output = raw.joinWith(results,raw.col("customPK") === results.col("_1"))
+    output.printSchema
+    output.show()
 
     //for (d <- results.take(10)) {
     //    println(d)
@@ -91,3 +93,4 @@ object LatestVersionExtracter {
   }
 } 
 case class Metadata(filePath: String,versionDate: String, version: String)
+case class RawFormat(content: String, docid: String, docversion: String, length: Long, primary_key: String, state: Long, year: Long, customPK: String)
