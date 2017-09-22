@@ -42,7 +42,7 @@ object LatestVersionExtracter {
   }
 
   def getTimestampString_udf = udf(getTimestampString _)
-
+  def comb = udf((s1: String, s2: String) => s1+"_"+s2)
   def getPK = udf((filePath: String, version: String) => Array(filePath.split("/")(1),filePath.split("/")(2),filePath.split("/")(3)).mkString("_"))
   def customPK = udf((primary_key: String) => primary_key.split("_").slice(0,3).mkString("_"))
   def getTimestamp = to_timestamp(col("timestamp_string"), "MM-dd-yyyy")
@@ -83,17 +83,15 @@ object LatestVersionExtracter {
     import spark.implicits._
 
     val data = spark.read.json("/user/alexeys/metadata").select("filePath","versionDate","version").as[Metadata]
-    val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString_udf(col("versionDate"))).withColumn("timestamp", getTimestamp) //drop("")
+    val data_w_timestamps = data.withColumn("timestamp_string",getTimestampString_udf(col("versionDate"))).withColumn("timestamp", getTimestamp)
     val ready_to_join = data_w_timestamps.withColumn("primary_key_to_remove",getPK($"filePath",$"version")).select("primary_key_to_remove","version","timestamp").as[(String,String,java.sql.Timestamp)]
-    val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.as[(String,String)]
-    //results.show(40,false)
-
+    val results = ready_to_join.groupByKey(_._1).mapGroups((id,iterator)=>(id,iterator.toList.sortWith(_._3.getTime < _._3.getTime).map(_._2))).map{case (x,y) => (x,getLatest(y))}.withColumn("combined",comb(col("_1"),col("_2"))).as[(String,String,String)]
 
     //get raw data in the current format
     val raw = spark.read.json("file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json").withColumn("customPK",customPK(col("primary_key"))).as[RawFormat]
-    var output = raw.joinWith(results,raw.col("customPK") === results.col("_1")).toDF()
-    output = output.select(children(List("_1","_2"), output): _*).select(col("content"),col("docid"),col("length"),col("primary_key"),col("state"),col("year"),col("_2").alias("docversion"))
-    output.show()
+
+    var output = raw.joinWith(results,raw.col("primary_key") === results.col("combined")).toDF()
+    output = output.select(children(List("_1","_2"), output): _*).select(col("content"),col("docid"),col("length"),col("primary_key"),col("state"),col("year"),col("customPK"),col("_2").alias("docversion")).dropDuplicates("customPK").drop("customPK")
 
     //for (d <- results.take(10)) {
     //    println(d)
