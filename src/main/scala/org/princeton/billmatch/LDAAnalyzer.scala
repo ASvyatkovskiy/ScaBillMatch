@@ -49,51 +49,35 @@ object LDAAnalyzer {
   def run(params: Config) {
 
     val spark = SparkSession.builder().appName("LDAAnalyzer")
-      .config("spark.dynamicAllocation.enabled","true")
+      //.config("spark.dynamicAllocation.enabled","true")
       .config("spark.shuffle.service.enabled","true")
+      .config("spark.shuffle.memoryFraction","0.7")
       .config("spark.sql.codegen.wholeStage", "true")
+      .config("spark.driver.maxResultSize", "10g")
       .getOrCreate()
 
     import spark.implicits._
 
     val vv: String = params.getString("ldaAnalyzer.docVersion") //like "Enacted"
-    val input = spark.read.json(params.getString("ldaAnalyzer.inputBillsFile")).filter($"docversion" === vv)
-    val npartitions = (4.0*input.count()/100000.0).toInt
+    val nGramGranularity = params.getInt("ldaAnalyzer.nGramGranularity")
+    val numTextFeatures = params.getInt("ldaAnalyzer.numTextFeatures")
+    val addNGramFeatures = params.getBoolean("ldaAnalyzer.addNGramFeatures")
+    val kval = params.getInt("ldaAnalyzer.kval")
 
-    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content")) //.filter("docversion == Introduced")
-    bills.explain
+    val input = spark.read.json(params.getString("ldaAnalyzer.inputFile")).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content")))
+    val npartitions = (4*input.count()/1000).toInt
+    val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
 
-    val cleaned_df = bills.withColumn("cleaned",Utils.cleaner_udf(col("content"))).drop("content")
-
-    //tokenizer = Tokenizer(inputCol="text", outputCol="words")
-    var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
-    val tokenized_df = tokenizer.transform(cleaned_df)
-
-    //remove stopwords 
-    var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
-    var prefeaturized_df = remover.transform(tokenized_df).drop("words")
-
-    prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("filtered").alias("combined"))
-
-    //hashing
-    var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(params.getInt("ldaAnalyzer.numTextFeatures"))
-    val featurized_df = hashingTF.transform(prefeaturized_df)
-
-    var idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
-    //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
-    var idfModel = idf.fit(featurized_df)
-    val rescaled_df = idfModel.transform(featurized_df).drop("rawFeatures")
-    rescaled_df.printSchema()
-
+    var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity).cache()
+    //features_df.show
 
     // Trains LDA model
-    val kval: Int = 100
-    val lda = new LDA().setK(kval).setMaxIter(10)
+    val lda = new LDA().setK(kval).setMaxIter(5)
 
-    val model = lda.fit(rescaled_df)
+    val model = lda.fit(features_df)
 
-    val ll = model.logLikelihood(rescaled_df)
-    val lp = model.logPerplexity(rescaled_df)
+    val ll = model.logLikelihood(features_df)
+    val lp = model.logPerplexity(features_df)
     println(s"The lower bound on the log likelihood of the entire corpus: $ll")
     println(s"The upper bound bound on perplexity: $lp")
 
@@ -103,9 +87,9 @@ object LDAAnalyzer {
     println("The topics described by their top-weighted terms:")
     topics.show()
 
-    val clusters_df = model.transform(rescaled_df)
-    clusters_df.show()
-    clusters_df.printSchema()
+    val clusters_df = model.transform(features_df)
+    //clusters_df.show()
+    //clusters_df.printSchema()
 
     //FIXME save the dataframe with predicted labels if you need
     //clusters_df.select("primary_key","prediction").write.format("parquet").save(params.getString("ldaAnalyzer.outputFile"))
