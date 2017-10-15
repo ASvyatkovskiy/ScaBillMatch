@@ -91,8 +91,8 @@ object LDAAnalyzer {
     //clusters_df.show()
     //clusters_df.printSchema()
 
-    //FIXME save the dataframe with predicted labels if you need
-    //clusters_df.select("primary_key","prediction").write.format("parquet").save(params.getString("ldaAnalyzer.outputFile"))
+    //save the dataframe with predicted labels if you need
+    clusters_df.select("primary_key","topicDistribution").write.parquet(params.getString("ldaAnalyzer.outputFile"))
 
     spark.stop()
    }
