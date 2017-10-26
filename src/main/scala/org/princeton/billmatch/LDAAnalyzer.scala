@@ -69,7 +69,7 @@ object LDAAnalyzer {
     val npartitions = (4*input.count()/1000).toInt
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
 
-    var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity).cache()
+    var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity,true).cache()
     if (verbose) features_df.show
 
     // Trains LDA model

@@ -12,7 +12,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.WrappedArray
 
-import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
+import org.apache.spark.ml.feature.{HashingTF, CountVectorizerModel, CountVectorizer, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
 import org.apache.spark.ml.clustering.{KMeans, BisectingKMeans}
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 
@@ -37,6 +37,7 @@ import org.apache.spark.ml.linalg.{
 import org.princeton.billmatch.linalg._
 
 import java.io._
+import java.io.FileWriter
 
 object Utils { 
 
@@ -196,7 +197,7 @@ object Utils {
 
   def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
 
-  def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int) : DataFrame = {
+  def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int, useCountVectorizer: Boolean = false) : DataFrame = {
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
@@ -216,17 +217,28 @@ object Utils {
        prefeaturized_df = ngram_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("length"),col("ngram").alias("combined"))
     } else {
        prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("length"),col("filtered").alias("combined"))
-       prefeaturized_df.printSchema()
+       //prefeaturized_df.printSchema()
     }
 
-    //hashing
-    var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(numTextFeatures)
-    val featurized_df = hashingTF.transform(prefeaturized_df).drop("combined")
+    if (useCountVectorizer) {
+        var TFmodel = new CountVectorizer().setInputCol("combined").setOutputCol("rawFeatures").fit(prefeaturized_df)
+        prefeaturized_df = TFmodel.transform(prefeaturized_df).drop("combined")
+        val vocab = TFmodel.vocabulary
 
+        val fw: FileWriter = new FileWriter("vocab.dat")
+        for (str <- vocab) {
+          fw.write(str + "\n")
+        }
+        fw.close()
+    } else {
+        var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(numTextFeatures)
+        prefeaturized_df = hashingTF.transform(prefeaturized_df).drop("combined")
+    }
+    
     var idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
     //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
-    var idfModel = idf.fit(featurized_df)
-    idfModel.transform(featurized_df).drop("rawFeatures").drop("content")
+    var idfModel = idf.fit(prefeaturized_df)
+    idfModel.transform(prefeaturized_df).drop("rawFeatures").drop("content")
   }
 
   def converter(row: scala.collection.Seq[Any]) : (Int,NewSparseVector) = {
