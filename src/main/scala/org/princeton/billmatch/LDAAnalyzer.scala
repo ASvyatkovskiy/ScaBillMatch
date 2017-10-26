@@ -53,7 +53,7 @@ object LDAAnalyzer {
       .config("spark.shuffle.service.enabled","true")
       .config("spark.shuffle.memoryFraction","0.7")
       .config("spark.sql.codegen.wholeStage", "true")
-      .config("spark.driver.maxResultSize", "10g")
+      .config("spark.driver.maxResultSize", "15g")
       .getOrCreate()
 
     import spark.implicits._
@@ -63,33 +63,41 @@ object LDAAnalyzer {
     val numTextFeatures = params.getInt("ldaAnalyzer.numTextFeatures")
     val addNGramFeatures = params.getBoolean("ldaAnalyzer.addNGramFeatures")
     val kval = params.getInt("ldaAnalyzer.kval")
+    val verbose = params.getBoolean("ldaAnalyzer.verbose")
 
     val input = spark.read.json(params.getString("ldaAnalyzer.inputFile")).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content")))
     val npartitions = (4*input.count()/1000).toInt
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
 
     var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity).cache()
-    //features_df.show
+    if (verbose) features_df.show
 
     // Trains LDA model
-    val lda = new LDA().setK(kval).setMaxIter(5)
+    val lda = new LDA().setK(kval).setMaxIter(10)
 
     val model = lda.fit(features_df)
-
-    val ll = model.logLikelihood(features_df)
-    val lp = model.logPerplexity(features_df)
-    println(s"The lower bound on the log likelihood of the entire corpus: $ll")
-    println(s"The upper bound bound on perplexity: $lp")
-
+  
+    if (verbose) {
+      val ll = model.logLikelihood(features_df)
+      val lp = model.logPerplexity(features_df)
+      println(s"The lower bound on the log likelihood of the entire corpus: $ll")
+      println(s"The upper bound bound on perplexity: $lp")
+    }
 
     // Describe topics.
-    val topics = model.describeTopics(3)
-    println("The topics described by their top-weighted terms:")
-    topics.show()
+    val topics = model.describeTopics(10)
+    if (verbose) {
+      println("The topics described by their top-weighted terms:")
+      topics.show(false)
+      //val matrix = model.topicsMatrix
+    }
+    topics.write.parquet(params.getString("ldaAnalyzer.outputFile")+"_topics")
 
     val clusters_df = model.transform(features_df)
-    //clusters_df.show()
-    //clusters_df.printSchema()
+    if (verbose) {
+      clusters_df.show(false)
+      clusters_df.printSchema()
+    }
 
     //save the dataframe with predicted labels if you need
     clusters_df.select("primary_key","topicDistribution").write.parquet(params.getString("ldaAnalyzer.outputFile"))
