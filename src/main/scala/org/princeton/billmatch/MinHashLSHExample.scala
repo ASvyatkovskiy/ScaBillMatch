@@ -10,6 +10,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
+import org.apache.spark.sql.DataFrame
 
 //import org.apache.spark.ml.feature.{HashingTF, IDF, RegexTokenizer, Tokenizer, NGram, StopWordsRemover}
 
@@ -17,6 +18,7 @@ import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 
 import org.princeton.billmatch.feature._
+
 
 object MinHashLSHExample {
 
@@ -29,8 +31,8 @@ object MinHashLSHExample {
    * @tparam T The class type of lsh
    * @return A tuple of two doubles, representing precision and recall rate
    */
-  def calculateApproxSimilarityJoin[T <: LSHModel[T]](
-      lsh: LSH[T],
+  def calculateApproxSimilarityJoin[T <: CustomizedLSHModel[T]](
+      lsh: CustomizedLSH[T],
       datasetA: Dataset[_],
       datasetB: Dataset[_],
       threshold: Double): (Double, Double) = {
@@ -52,8 +54,8 @@ object MinHashLSHExample {
 
   def scaler = udf((d:Double) => (100.0-100.0*d).toFloat)
 
-  def calculateApproxSimilarityJoin2[T <: LSHModel[T]](
-      lsh: LSH[T],
+  def calculateApproxSimilarityJoin2[T <: CustomizedLSHModel[T]](
+      lsh: CustomizedLSH[T],
       datasetA: Dataset[_],
       datasetB: Dataset[_],
       threshold: Double,
@@ -69,28 +71,27 @@ object MinHashLSHExample {
     actual.show(400)
     actual.printSchema()
     actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).withColumn("similarity",scaler(col("distCol"))).drop("distCol").write.parquet("/user/alexeys/test_similarity_join"+state_pair)
-    //actual.select(col("datasetA.primary_key").alias("pk1"),col("datasetB.primary_key").alias("pk2"),col("distCol")).show() 
   }
 
-  def calculateFor2States[T <: LSHModel[T]](
-      lsh: LSH[T],
+  def calculateFor2States[T <: CustomizedLSHModel[T]](
+      lsh: CustomizedLSH[T],
       pp: List[Long],
       df: Dataset[_],
       threshold: Double): Unit = {
 
-      val part1 = df.filter(col("state") === pp(0)) //.coalesce(200).cache()
+      val part1 = df.filter(col("state") === pp(0))
       val part2 = df.filter(col("state") === pp(1))
       val state_pair = pp(0).toString+"_"+pp(1).toString
       calculateApproxSimilarityJoin2(lsh,part1,part2,threshold,state_pair)
   }
 
-  def calculateFor2States2[T <: LSHModel[T]](
-      lsh: LSH[T],
+  def calculateFor2States2[T <: CustomizedLSHModel[T]](
+      lsh: CustomizedLSH[T],
       pp: Tuple2[Int,List[Int]],
       df: Dataset[_],
       threshold: Double): Unit = {
 
-      val part1 = df.filter(col("state") === pp._1) //.coalesce(200).cache()
+      val part1 = df.filter(col("state") === pp._1)
       for (p <- pp._2) {
         val part2 = df.filter(col("state") === p) 
         val state_pair = pp._1.toString+p.toString
@@ -115,12 +116,17 @@ object MinHashLSHExample {
 
     val params = ConfigFactory.load("makeCartesian")
 
-    val vv: String = "Introduced" //params.getString("makeCartesian.docVersion") //like "Enacted"
-    val inputFile: String = "file:///scratch/network/alexeys/bills/lexs/bills_combined_3_CAFLVA.json"
+    //val vv: String = "Introduced" //params.getString("makeCartesian.docVersion") //like "Enacted"
+    //val inputFile: String = "file:///scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p*" //"file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json"
+    //val input = spark.read.json(inputFile).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content"))) //.filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
+    //val input = spark.read.json("/user/alexeys/bills_combined_raw_with_latest_50p1p2").filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
+
+    val vv: String = "Introduced"
+    val inputFile: String = "file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json"
     val input = spark.read.json(inputFile).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
 
-    //val npartitions = (4*input.count()/1000).toInt
-    //val bills = input.coalesce(100).cache() - 18573 seconds, vs 30000 seconds sequential
+    ///val npartitions = (4*input.count()/1000).toInt
+    ///val bills = input.coalesce(100).cache() - 18573 seconds, vs 30000 seconds sequential
     val bills = input.repartition(400,col("primary_key")).cache()  //Math.max(npartitions,200),col("primary_key")) //,col("content"))
     bills.explain
 
@@ -128,7 +134,7 @@ object MinHashLSHExample {
     val numTextFeatures = 1048576 //params.getInt("makeCartesian.numTextFeatures")
 
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
-    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
+    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content")))
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
     val tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
@@ -146,7 +152,7 @@ object MinHashLSHExample {
     val featurized_df = hashingTF.transform(ngram_df).select("keys","primary_key","state")
     featurized_df.show()
 
-    val mh = new MinHashLSH().setNumHashTables(20)
+    val mh = new CustomizedMinHashLSH().setNumHashTables(100)
       .setInputCol("keys")
       .setOutputCol("values")
       .setSeed(12345)
