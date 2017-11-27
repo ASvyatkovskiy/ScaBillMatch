@@ -41,11 +41,9 @@ import java.io.FileWriter
 
 object Utils { 
 
-  def pairup (document: MetaLabeledDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaLabeledDocument]], strict_params: Tuple4[Boolean, Int, java.lang.String, Int], onlyInOut: Boolean, optimize: Int) : (MetaLabeledDocument, Array[CartesianPair]) = {
+  def pairup (document: MetaLabeledDocument, thewholething: org.apache.spark.broadcast.Broadcast[Array[MetaLabeledDocument]], onlyInOut: Boolean, optimize: Int) : (MetaLabeledDocument, Array[CartesianPair]) = {
 
     val documents = thewholething.value
-
-    val (use_strict,strict_state,strict_docid,strict_year) = strict_params
 
     val idocversion = document.docversion
     val istate = document.state
@@ -65,62 +63,41 @@ object Utils {
        val label2 = jevent.prediction
        val length2 = jevent.length
 
-       if (use_strict) {
-         //extra condition
-         if (istate == strict_state && idocid == strict_docid && iyear == strict_year) {
-           optimize match {
-             case 0 if (pk1 < pk2 && istate != jstate) => {
-                 var output: CartesianPair = CartesianPair(pk1,pk2)
-                 output_arr += output
-             }
-             case 1 if (pk1 < pk2 && istate != jstate && label1 == label2) => {
-                 var output: CartesianPair = CartesianPair(pk1,pk2)
-                 output_arr += output
-             }
-             case 2 if (pk1 < pk2 && istate != jstate && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) => {
-                 var output: CartesianPair = CartesianPair(pk1,pk2)
-                 output_arr += output
-             }  
-             case _ =>
+       //simple condition
+       if (onlyInOut) {
+         optimize match {
+           case 0 if (pk1 < pk2 && istate != jstate) => {
+               var output: CartesianPair = CartesianPair(pk1,pk2)
+               output_arr += output
            }
-         } 
+           case 1 if (pk1 < pk2 && istate != jstate && label1 == label2) => {
+               var output: CartesianPair = CartesianPair(pk1,pk2)
+               output_arr += output
+           }
+           case 2 if (pk1 < pk2 && istate != jstate && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) => {
+               var output: CartesianPair = CartesianPair(pk1,pk2)
+               output_arr += output
+           }   
+           case _ =>
+         }  
        } else {
-            //simple condition
-            if (onlyInOut) {
-             optimize match {
-               case 0 if (pk1 < pk2 && istate != jstate) => {
-                   var output: CartesianPair = CartesianPair(pk1,pk2)
-                   output_arr += output
-               }
-               case 1 if (pk1 < pk2 && istate != jstate && label1 == label2) => {
-                   var output: CartesianPair = CartesianPair(pk1,pk2)
-                   output_arr += output
-               }
-               case 2 if (pk1 < pk2 && istate != jstate && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) => {
-                   var output: CartesianPair = CartesianPair(pk1,pk2)
-                   output_arr += output
-               }   
-               case _ =>
-             }  
-           } else {
-             //in-out and in-in
-             optimize match {
-               case 0 if (pk1 < pk2 && istate != jstate) => {
-                   var output: CartesianPair = CartesianPair(pk1,pk2)
-                   output_arr += output
-               }
-               case 1 if (pk1 < pk2 && istate != jstate && label1 == label2) => {
-                   var output: CartesianPair = CartesianPair(pk1,pk2)
-                   output_arr += output
-               }
-               case 2 if (pk1 < pk2 && istate != jstate && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) => {
-                   var output: CartesianPair = CartesianPair(pk1,pk2)
-                   output_arr += output
-               }   
-               case _ =>
-             }  
-           } 
-        }
+         //in-out and in-in
+         optimize match {
+           case 0 if (pk1 < pk2 && istate != jstate) => {
+               var output: CartesianPair = CartesianPair(pk1,pk2)
+               output_arr += output
+           }
+           case 1 if (pk1 < pk2 && istate != jstate && label1 == label2) => {
+               var output: CartesianPair = CartesianPair(pk1,pk2)
+               output_arr += output
+           }
+           case 2 if (pk1 < pk2 && istate != jstate && label1 == label2 && Math.abs(length1-length2)/Math.sqrt(length1*length2) < 0.26) => {
+               var output: CartesianPair = CartesianPair(pk1,pk2)
+               output_arr += output
+           }   
+           case _ =>
+         }  
+       } 
      }
      (document,output_arr.toArray)
   }
