@@ -240,7 +240,36 @@ class Preprocess(object):
 
 
 if __name__=='__main__':
-    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p1_fed.json",True,True)
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_3states2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_3_CAFLVA.json",True,True)
+    #without uniforms
+    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p1_fed.json",True,True)
     preprocessor.fillStructures()
     preprocessor.saveStructures()
+    #without uniforms
+    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p2.json",True,True)
+    preprocessor.fillStructures()
+    preprocessor.saveStructures()
+    #with uniforms
+    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p1_fed.json",True,False)
+    preprocessor.fillStructures()
+    preprocessor.saveStructures()
+    #with uniforms
+    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p2.json",True,False)
+    preprocessor.fillStructures()
+    preprocessor.saveStructures()
+
+    #with uniforms
+    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p1.json",True,True)
+    #preprocessor.fillStructures()
+    #preprocessor.saveStructures()
+    #with uniforms
+    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p2_fed.json",True,True)
+    #preprocessor.fillStructures()
+    #preprocessor.saveStructures()
+    #with uniforms
+    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p1.json",True,False)
+    #preprocessor.fillStructures()
+    #preprocessor.saveStructures()
+    #with uniforms
+    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p2_fed.json",True,False)
+    #preprocessor.fillStructures()
+    #preprocessor.saveStructures()
