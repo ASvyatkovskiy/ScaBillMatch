@@ -10,7 +10,6 @@ Following are the key parameters that need to be filled in the resources/makeCar
         numConcepts: number of concepts to use for LSA
         kval: number of clusters for k-means
         onlyInOut: a switch between in-out of state and using both in-out and in-in state pairs
-	use_strict: boolean, yes or no to consider strict parameters
 	inputFile: input file, one JSON per line
 	outputFile: output file
         outputParquetFile: output parquet sink
@@ -144,10 +143,8 @@ object ExtractCandidates {
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].cache()
     var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
 
-    val strict_params = (params.getBoolean("makeCartesian.use_strict"),params.getInt("makeCartesian.strict_state"),params.getString("makeCartesian.strict_docid"),params.getInt("makeCartesian.strict_year"))
-
     var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("makeCartesian.nPartitions"))
-                          .map(x => Utils.pairup(x,bills_meta_bcast, strict_params, params.getBoolean("makeCartesian.onlyInOut"),params.getInt("makeCartesian.optimizationLevel"))).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
+                          .map(x => Utils.pairup(x,bills_meta_bcast, params.getBoolean("makeCartesian.onlyInOut"),params.getInt("makeCartesian.optimizationLevel"))).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
     cartesian_pairs.saveAsObjectFile(params.getString("makeCartesian.outputFile"))
     spark.stop()
