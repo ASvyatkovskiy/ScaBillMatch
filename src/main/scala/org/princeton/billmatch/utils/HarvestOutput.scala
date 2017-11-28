@@ -26,7 +26,7 @@ object HarvestOutput {
      input.write.parquet(path) 
   } else {
     val odata = spark.sparkContext.objectFile[Tuple2[Tuple2[String,String],Double]](specific_class+"_billAnalyzer.outputMainFile")
-    val odata_df = skimmed_data.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity")
+    val odata_df = odata.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity")
     odata_df.write.parquet(specific_class+"_billAnalyzer.outputMainFile"+"_df")
   }
  }
