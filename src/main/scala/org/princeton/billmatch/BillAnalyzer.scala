@@ -2,7 +2,7 @@ package org.princeton.billmatch
 
 /*BillAnalyzer: an app. that performs document or section all=pairs similarity starting off CartesianPairs
 
-Following are the key parameters need to be filled in the resources/billAnalyzer.conf file:
+Following are the key parameters need to be filled in the resources/workflow1_billAnalyzer.conf file:
     measureName: Similarity measure used
     inputParquetFile: Parquet file with features
     inputPairsFile: CartesianPairs object input file
@@ -40,7 +40,7 @@ object BillAnalyzer {
 
     val t0 = System.nanoTime()
 
-    val params = ConfigFactory.load("billAnalyzer")
+    val params = ConfigFactory.load("workflow1_billAnalyzer")
     run(params)
 
     val t1 = System.nanoTime()
@@ -60,16 +60,16 @@ object BillAnalyzer {
 
     import spark.implicits._
  
-    val bills = spark.read.parquet(params.getString("billAnalyzer.inputParquetFile")).coalesce(params.getInt("billAnalyzer.nPartitions")).cache()
+    val bills = spark.read.parquet(params.getString("workflow1_billAnalyzer.inputParquetFile")).coalesce(params.getInt("workflow1_billAnalyzer.nPartitions")).cache()
     
     val hashed_bills = bills.select("primary_key","features").rdd.map(row => converted(row.toSeq)).cache()
 
-    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("billAnalyzer.inputPairsFile"),params.getInt("billAnalyzer.nCPartitions")).map(pp => (pp.pk1,pp.pk2))
+    val cartesian_pairs = spark.sparkContext.objectFile[CartesianPair](params.getString("workflow1_billAnalyzer.inputPairsFile"),params.getInt("workflow1_billAnalyzer.nCPartitions")).map(pp => (pp.pk1,pp.pk2))
 
     var similarityMeasure: SimilarityMeasure = null
     var threshold: Double = 0.0
 
-    params.getString("billAnalyzer.measureName") match {
+    params.getString("workflow1_billAnalyzer.measureName") match {
       case "cosine" => {
         similarityMeasure = CosineSimilarity
         threshold = -20.0
@@ -110,8 +110,8 @@ object BillAnalyzer {
 
     val firstjoin = Utils.twoSidedJoin(cartesian_pairs,hashed_bills)
     val matches = firstjoin.mapValues({case (v1,v2) => similarityMeasure.compute(v1,v2)}).filter({case (k,v) => (v > threshold)})
-    //matches.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").write.parquet(params.getString("billAnalyzer.outputMainFile"))
-    matches.saveAsObjectFile(params.getString("billAnalyzer.outputMainFile"))
+    //matches.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").write.parquet(params.getString("workflow1_billAnalyzer.outputMainFile"))
+    matches.saveAsObjectFile(params.getString("workflow1_billAnalyzer.outputMainFile"))
 
     spark.stop()
    }
