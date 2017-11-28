@@ -18,7 +18,7 @@ def createConfigsA(configBaseName, nPartitions, nCPartitions, measureName, input
 
 def createConfigsB(nPartitions, nCPartitions, measureName, inputParquetFile, inputPairsFile, outputMainFile, strictCats):
     def createOneConfig(cat):
-        configBaseName = "makeCartesian" 
+        configBaseName = "workflow1_makeCartesian" 
         with open(configBaseName+cat+".conf","w") as f:
             f.write(configBaseName+" {\n")
             if cat != "":
@@ -29,7 +29,7 @@ def createConfigsB(nPartitions, nCPartitions, measureName, inputParquetFile, inp
             f.write("    onlyInOut    = true,\n")
             f.write("    nGramGranularity = 5,\n")
             f.write("    addNGramFeatures = true,\n")
-            f.write("    inputFile    = \"file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json\",\n")
+            f.write("    inputFile    = \"file:///scratch/network/alexeys/bills/lexs/bills_combined_3_COILNJ_small.json\",\n")
             if cat != "":
                 f.write("    outputFile   = \"/user/alexeys/valid_pairs_\""+cat+",\n")
                 f.write("    outputParquetFile = \"/user/alexeys/bills_combined_\""+cat+",\n")
