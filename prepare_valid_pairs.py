@@ -5,8 +5,8 @@ import glob
 from math import ceil
 import sys
 
-BASE_VALID_DIR = sys.argv[1] #"/user/alexeys/valid_pairs_50_300k_replica2_unigram/"
-FILES_PER_FOLDER = 10 # up to 3
+BASE_VALID_DIR = sys.argv[1]
+FILES_PER_FOLDER = 3
 
 #Prepare sub-folder
 fileNames = glob.glob(BASE_VALID_DIR+"part*")
