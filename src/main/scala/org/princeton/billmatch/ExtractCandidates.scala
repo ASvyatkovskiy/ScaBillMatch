@@ -4,7 +4,7 @@ package org.princeton.billmatch
 Application: ExtractCandidates, produce all the pairs of primary keys of the documents satisfying a predicate.
 Perform document bucketing using k-means clustering.
 
-Following are the key parameters that need to be filled in the resources/makeCartesian.conf file:
+Following are the key parameters that need to be filled in the resources/workflow1_makeCartesian.conf file:
 	docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted...
         useLSA: whether to use truncated SVD
         numConcepts: number of concepts to use for LSA
@@ -66,7 +66,7 @@ object ExtractCandidates {
 
     val t0 = System.nanoTime()
 
-    val params = ConfigFactory.load("makeCartesian")
+    val params = ConfigFactory.load("workflow1_makeCartesian")
 
     run(params)
 
@@ -86,14 +86,14 @@ object ExtractCandidates {
 
     import spark.implicits._
 
-    val vv: String = params.getString("makeCartesian.docVersion") //like "Enacted"
-    val nGramGranularity = params.getInt("makeCartesian.nGramGranularity")
-    val addNGramFeatures = params.getBoolean("makeCartesian.addNGramFeatures")
-    val numTextFeatures = params.getInt("makeCartesian.numTextFeatures")
-    val useLSA = params.getBoolean("makeCartesian.useLSA")
-    val kval = params.getInt("makeCartesian.kval")
+    val vv: String = params.getString("workflow1_makeCartesian.docVersion") //like "Enacted"
+    val nGramGranularity = params.getInt("workflow1_makeCartesian.nGramGranularity")
+    val addNGramFeatures = params.getBoolean("workflow1_makeCartesian.addNGramFeatures")
+    val numTextFeatures = params.getInt("workflow1_makeCartesian.numTextFeatures")
+    val useLSA = params.getBoolean("workflow1_makeCartesian.useLSA")
+    val kval = params.getInt("workflow1_makeCartesian.kval")
 
-    val input = spark.read.json(params.getString("makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
+    val input = spark.read.json(params.getString("workflow1_makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
     input.printSchema()
     input.show()
 
@@ -117,7 +117,7 @@ object ExtractCandidates {
 
         // Compute the top 5 singular values and corresponding singular vectors.
         //320 concepts worked perfectly for 10 states
-        val numConcepts = params.getInt("makeCartesian.numConcepts")
+        val numConcepts = params.getInt("workflow1_makeCartesian.numConcepts")
         features_df = Utils.LSA(spark,dataRDD,numConcepts,numConcepts*2)
         features_df.show()
         features_df.printSchema
@@ -138,15 +138,15 @@ object ExtractCandidates {
         clusters_df = Utils.KMeansSuite(features_df,kval)
     }
  
-    clusters_df.select("primary_key","docversion","docid","state","year","prediction","length","features").write.parquet(params.getString("makeCartesian.outputParquetFile"))
+    clusters_df.select("primary_key","docversion","docid","state","year","prediction","length","features").write.parquet(params.getString("workflow1_makeCartesian.outputParquetFile"))
 
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].cache()
     var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
 
-    var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("makeCartesian.nPartitions"))
-                          .map(x => Utils.pairup(x,bills_meta_bcast, params.getBoolean("makeCartesian.onlyInOut"),params.getInt("makeCartesian.optimizationLevel"))).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
+    var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("workflow1_makeCartesian.nPartitions"))
+                          .map(x => Utils.pairup(x,bills_meta_bcast, params.getBoolean("workflow1_makeCartesian.onlyInOut"),params.getInt("workflow1_makeCartesian.optimizationLevel"))).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
-    cartesian_pairs.saveAsObjectFile(params.getString("makeCartesian.outputFile"))
+    cartesian_pairs.saveAsObjectFile(params.getString("workflow1_makeCartesian.outputFile"))
     spark.stop()
    }
 }
