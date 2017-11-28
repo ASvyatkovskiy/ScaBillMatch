@@ -21,7 +21,7 @@ object HarvestOutput {
   val path = specific_params.getString(specific_class+".outputFileBase")
 
   // Loads data.
-  val input = spark.read.parquet(path+"_*")
+  val input = spark.read.parquet(path+"*_*")
   input.write.parquet(path) 
  }
 }
