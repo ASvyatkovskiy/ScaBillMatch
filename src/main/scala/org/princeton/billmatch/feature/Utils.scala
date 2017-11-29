@@ -174,7 +174,7 @@ object Utils {
 
   def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
 
-  def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int, useCountVectorizer: Boolean = false) : DataFrame = {
+  def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int, useCountVectorizer: Boolean = false, vocabLimit: Int = 262144) : DataFrame = {
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
@@ -198,7 +198,7 @@ object Utils {
     }
 
     if (useCountVectorizer) {
-        var TFmodel = new CountVectorizer().setInputCol("combined").setOutputCol("rawFeatures").fit(prefeaturized_df)
+        var TFmodel = new CountVectorizer().setVocabSize(vocabLimit).setInputCol("combined").setOutputCol("rawFeatures").fit(prefeaturized_df)
         prefeaturized_df = TFmodel.transform(prefeaturized_df).drop("combined")
         val vocab = TFmodel.vocabulary
 
