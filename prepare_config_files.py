@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 import sys
 
-def createConfigsA(configBaseName, nPartitions, nCPartitions, measureName, inputParquetFile, inputPairsFile, outputMainFile, nFolders):
+def createConfigsA(nPartitions, nCPartitions, measureName, inputParquetFile, inputPairsFile, outputMainFile, nFolders):
     def createOneConfig(nFolders):
+        configBaseName = "workflow1_billAnalyzer"
         if nFolders < 0: return
         with open(configBaseName+str(nFolders)+".conf","w") as f:
-            f.write("billAnalyzer {\n")
+            f.write("workflow1_billAnalyzer {\n")
             f.write("  nPartitions  = "+str(nPartitions)+",\n")
             f.write("  nCPartitions = "+str(nCPartitions)+",\n")
             f.write("  measureName = \""+measureName+"\",\n")
@@ -53,5 +54,4 @@ if __name__=='__main__':
     inputParquetFile = sys.argv[1] #"/user/alexeys/bills_combined50_300k_replica2_unigram"
     inputPairsFile = sys.argv[2] #"/user/alexeys/valid_pairs_50_300k_replica2_unigram"
     outputMainFile = sys.argv[3] #"/user/alexeys/output50_300k_replica2_unigram"
-    configBaseName = sys.argv[4]
-    createConfigsA(configBaseName, nPartitions, nCPartitions, measureName, inputParquetFile, inputPairsFile, outputMainFile, nFolders)
+    createConfigsA(nPartitions, nCPartitions, measureName, inputParquetFile, inputPairsFile, outputMainFile, nFolders)
