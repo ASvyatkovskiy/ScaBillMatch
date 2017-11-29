@@ -61,12 +61,22 @@ sbt assembly
 Submit as follows:
 ```bash
 spark-submit --class org.apache.spark.ml.feature.ExtractMinHashLSH --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar
-
-#FIXME need one more step to combine output folders per state pair to 1 folder
-#FIXME put all in wrapper_workflow2.py
 ```
 
 The output will be a set of parquet files, one folder per state pair.
+
+## Automatic submission
+
+Simply do:
+```
+python wrapper_workflow2.py
+```
+
+And pick up your results in the raw format in the file pointed to by:
+```
+outputFileBase   = "/user/alexeys/wf2_similarity_join"
+```
+when it is finished. The proceed to "Postprocessing" section.
 
 # Workflow1 [more difficult]
 
@@ -75,17 +85,7 @@ Proceeds in 2 steps
 ## Make pairs
 
 `ExtractCandidates` produces all the pairs of primary keys of the documents satisfying a predicate. Performs document clustering using k-means.
-
-Following are the key parameters that need to be filled in the resources/makeCartesian.conf file:
-        docVersion: document version: consider document pairs having a specific version. E.g. Introduced, Enacted...
-        useLSA: whether to use truncated SVD
-        numConcepts: number of concepts to use for LSA
-        kval: number of clusters for k-means
-        onlyInOut: a switch between in-out of state and using both in-out and in-in state pairs
-        inputFile: input file, one JSON per line
-        outputFile: output file
-        outputParquetFile: output parquet sink
-        
+    
 Configure parameters for your run in `src/main/resources/workflow1_makeCartesian.conf`:
 ```bash
 workflow1_makeCartesian {
@@ -130,12 +130,6 @@ spark-submit --class org.princeton.billmatch.ExtractCandidates --master yarn --d
 
 BillAnalyzer: an app. that performs document or section all=pairs similarity starting off CartesianPairs
 
-Following are the key parameters need to be filled in the resources/billAnalyzer.conf file:
-    measureName: Similarity measure used
-    inputParquetFile: Parquet file with features
-    inputPairsFile: CartesianPairs object input file
-    outputMainFile: key-key pairs and corresponding similarities, as Tuple2[Tuple2[String,String],Double]
-
 ```
 workflow1_billAnalyzer {
   nPartitions  = 120,
@@ -160,30 +154,7 @@ spark-submit --class org.princeton.billmatch.BillAnalyzer --master yarn --deploy
 
 ## Automate submission 
 
-To automate the submission, use the `misc/wrapper_workflow1.py` script, which looks like this:
-
-```python
-#!/usr/bin/env python
-
-from subprocess import Popen
-
-#step1: prepares eligible pairs
-Popen("sbt assembly",shell=True).wait()
-Popen("spark-submit --class org.princeton.billmatch.ExtractCandidates --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar",shell=True).wait()
-
-#this expects the workflow1_billAnalyzer.inputPairsFile
-Popen("python prepare_valid_pairs.py /user/alexeys/valid_pairs/",shell=True).wait()
-#workflow1_billAnalyzer.inputParquetFile workflow1_billAnalyzer.inputPairsFile workflow1_billAnalyzer.outputMainFile
-Popen("python prepare_config_files.py /user/alexeys/bills_combined/ /user/alexeys/valid_pairs/ /user/alexeys/output_sample/",shell=True).wait()
-
-#runs bill analysis step2 as 14 jobs
-for comb in range(14):
-    Popen("cp billAnalyzer"+str(comb)+".conf src/main/resources/billAnalyzer.conf",shell=True).wait()
-    Popen("sbt assembly",shell=True).wait()
-    Popen("spark-submit --class org.princeton.billmatch.BillAnalyzer --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 15g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar",shell=True).wait()
-    
-#FIXME need one more step to convert object files to parquet    
-```
+To automate the submission, use the `wrapper_workflow1.py` script.
 
 To run:
 
@@ -255,7 +226,7 @@ ordered_data.repartition(10).write.json("/user/alexeys/...")
 
 
 ## Produce light
-```
+```scala
 import org.princeton.billmatch.stats._
 
 //to get light specify:
