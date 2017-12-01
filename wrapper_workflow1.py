@@ -25,5 +25,6 @@ Popen("spark-submit --class org.princeton.billmatch.utils.HarvestOutput --master
 config = open("src/main/resources/workflow1_billAnalyzer.conf","r").readlines()
 for line in config:
     if "outputMainFile" in line: outputMainFile = line.split("=")[-1].lstrip(" \"").rstrip("\",\n")
-outputMainFile = "_".join(outputMainFile.split("_")[:-1])+"_*"
-Popen("hdfs dfs -rmr "+outputMainFile,shell=True).wait()
+outputMainFile = "_".join(outputMainFile.split("_")[:-1])
+Popen("hdfs dfs -rmr "+outputMainFile+"_*",shell=True).wait()
+print("The workflow1 results are in folder {}".format(outputMainFile)
