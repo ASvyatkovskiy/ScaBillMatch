@@ -242,3 +242,36 @@ ordered_data.repartition(10).write.json("/user/alexeys/...")
 
 # LDA
 
+To configure an LDA run, open `src/main/resources/ldaAnalyzer.conf`:
+
+```
+ldaAnalyzer {
+  verbose = false,
+  docVersion      = "Introduced",
+  inputFile    = "file:///scratch/network/alexeys/bills/lexs/bills_combined_3_COILNJ_small.json",
+  outputFile      = "/user/alexeys/LDA_CAFLVA_50t_unigram",
+  nGramGranularity = 5,
+  addNGramFeatures = false,
+  kval = 30,
+  numTextFeatures = 1048576,
+  vocabSizeLimit = 2097152
+}
+```
+
+Following parameters affect the feature extraction step (same as above):
+1. addNGramFeatures: boolean flag to switch between unigram and n-gram
+1. nGramGranularity: integer fixing the n-gram granularity size
+1. numTextFeatures: number of hashing buckets for TF -- currently obsolete, as the count vectorizer is used as default
+1. vocabSizeLimit: integer, power of 2, maximum size of the text frequency dictionary (CountVectorizer)
+
+Affecting clustering:
+1. kval: integer, number of clusters for LDA
+
+Input/output paths:
+1. inputFile: input JSON
+1. outputFile: output parquet
+
+To launch a job:
+```bash
+spark-submit --class org.princeton.billmatch.LDAAnalyzer --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar
+```
