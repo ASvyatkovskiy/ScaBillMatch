@@ -2,6 +2,7 @@
 
 import simplejson
 import glob
+import sys,os,re
 
 #bills/old/IL/2003/HB5102/HB5102_Introduced.txt^^^
 ''' 
@@ -136,36 +137,37 @@ states = {
 
 class Preprocess(object):
 
-    def __init__(self,inputname,outputname,use_cryptic_pk=True,exclude_uniforms=True):
+    def __init__(self,input_base_dir,output_base_dir,ofilename,use_cryptic_pk=True,exclude_uniforms=True,data_in_lexis_format=False):
         #switch between primary key as a long integer and primary key as a string
         self.use_cryptic_pk = use_cryptic_pk
-        self.inputs = glob.glob(inputname) #"/scratch/network/alexeys/bills/lexs/text_10states/*/*/catalog_*")
-        self.output_file = open(outputname,"wa") #"/scratch/network/alexeys/bills/lexs/bills_combined_10.json","wa")
+        self.input_base_dir = input_base_dir
+        self.output_file_name = ofilename
+        self.output_base_dir = output_base_dir
         self.output_dicts = list()
         self.exclude_uniforms = exclude_uniforms
+        self.data_in_lexis_format = data_in_lexis_format
 
-    def fillStructures(self): 
+    def fillStructures(self,state="all"): 
+        if self.data_in_lexis_format: self.convert_from_lexis(self.input_base_dir,self.output_base_dir,state)
+        if state == "all":
+            inputs = glob.glob(self.output_base_dir+"/catalog_*")
+        else:
+            inputs = glob.glob(self.output_base_dir+"/catalog_"+state+"*")
+
         if self.exclude_uniforms: uniforms = self.fillUniforms()
-        for input in self.inputs:
+        for input in inputs:
             with open(input,mode="r") as finput:
                 lines = finput.readlines()
                 for line in lines:
                     sid, content = line.split("^^^")
-                    split_sid = sid.split("/")
-                    if len(split_sid) == 5: 
-                        bla, state, year, docid, docversion_pre = split_sid
-                    elif len(split_sid) == 6:
-                        blah, bla, state, year, docid, docversion_pre = split_sid
-                    else: 
-                        print "Tokenization issue in file: ", input
-                        break
- 
+                    state, year, docid, docversion_pre = sid.split("/")
+
                     output_dict = {'content':None, 'year':None, 'state':'','docid':'', 'docversion':'', 'primary_key':'','length':0}
                     output_dict['year'] = int(year)
                     output_dict['state'] = us_state_abbrev[state]
                     output_dict['docid'] = docid
-                    version = docversion_pre.split("_")[1].rstrip(".txt")
-                    version = "".join(version.split())
+                    version = docversion_pre.rstrip(".txt")
+                    #version = "".join(version.split())
                     output_dict['docversion'] = version
                     output_dict['primary_key'] = state+"_"+year+"_"+docid+"_"+version
                     content = content.decode("utf-8",errors='replace')
@@ -184,10 +186,68 @@ class Preprocess(object):
         self.output_dicts  = {each['primary_key'] : each for each in self.output_dicts}.values()
 
     def saveStructures(self):
-        for i, output_dict in enumerate(self.output_dicts):
-            if not self.use_cryptic_pk: output_dict['primary_key'] = i
-            simplejson.dump(output_dict, self.output_file)
-            self.output_file.write('\n')
+        o = os.path.join(self.output_base_dir,self.output_file_name)
+        if os.path.isfile(o):
+            mode = "a+"
+        else: mode = "w+"
+
+        with open(o,mode) as output_file_name:
+            for i, output_dict in enumerate(self.output_dicts):
+                if not self.use_cryptic_pk: output_dict['primary_key'] = i
+                simplejson.dump(output_dict, output_file_name)
+                output_file_name.write('\n')
+
+
+    def convert_from_lexis(self,base_hdfs_dir,output_base_dir,state="all"):
+        '''Concert plain text files from LexisNexis into
+         document_id, document contents as string a single files'''
+        import pandas as pd
+        from subprocess import Popen
+
+        if state == "all":
+            billWalkOpj =  os.walk(os.path.join(base_hdfs_dir))
+        else:
+            billWalkOpj =  os.walk(os.path.join(base_hdfs_dir,state))
+        for (billdirpath, billdirnames, billfilenames) in billWalkOpj:
+            fname = ''
+
+            for bfname in billfilenames:
+                (bfn, bftype) = os.path.splitext(bfname)
+                if bftype != ".txt":
+                    continue
+                #print output_base_dir+"/catalog"+str(state)+str(year)
+                billFilePath = '%s/%s' % (billdirpath,bfname)
+                if state == "FD" or state == "federal":
+                    if not "text-versions/ih" in billdirpath and not "text-versions/is" in billdirpath: continue
+                    #print "/".join([billdirpath,"data.json"])
+                    metadata = pd.read_json("/".join([billdirpath,"data.json"]))
+                    docid = metadata['bill_version_id']['html']
+                    year = metadata['issued_on']['html'].split("-")[0]
+                    sid = "{}/{}/{}/whatever_Introduced.txt".format(state,year,docid)
+                else:
+                    state = billdirpath.split('/')[-3] 
+                    version = "".join(billFilePath.split("/")[-1].split("_")[1:])
+                    year = billdirpath.split('/')[-2]
+                    docid = billdirpath.split("/")[-1]
+                    sid = "{}/{}/{}/{}".format(state,year,docid,version)
+
+                #print billFilePath
+                data=open(billFilePath).read().replace('\n', ' ')
+                fname = "catalog_"+str(state)+str(year)
+                data_tuple = sid+"^^^"+data+"\n"
+                fname = os.path.join(output_base_dir,fname)
+                if not os.path.isfile(fname):
+                    ofile = open(fname,"wb")
+                    ofile.write(data_tuple)
+                    ofile.close()
+                else: 
+                    ofile = open(os.path.join(output_base_dir,fname),"ab") 
+                    #ofile.seek(0, 2)
+                    ofile.write(data_tuple)
+                    ofile.close()
+            #if os.path.isfile(fname):
+            #    Popen("mv "+fname+" "+output_base_dir,shell=True).wait()
+            #    Popen("rm "+fname,shell=True).wait() 
 
 
     def fillUniforms(self):
@@ -240,36 +300,8 @@ class Preprocess(object):
 
 
 if __name__=='__main__':
-    #without uniforms
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p1_fed.json",True,True)
-    preprocessor.fillStructures()
-    preprocessor.saveStructures()
-    #without uniforms
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p2.json",True,True)
-    preprocessor.fillStructures()
-    preprocessor.saveStructures()
-    #with uniforms
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p1_fed.json",True,False)
-    preprocessor.fillStructures()
-    preprocessor.saveStructures()
-    #with uniforms
-    preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p2.json",True,False)
-    preprocessor.fillStructures()
-    preprocessor.saveStructures()
 
-    #with uniforms
-    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p1.json",True,True)
-    #preprocessor.fillStructures()
-    #preprocessor.saveStructures()
-    #with uniforms
-    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_50_p2_fed.json",True,True)
-    #preprocessor.fillStructures()
-    #preprocessor.saveStructures()
-    #with uniforms
-    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part1_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p1.json",True,False)
-    #preprocessor.fillStructures()
-    #preprocessor.saveStructures()
-    #with uniforms
-    #preprocessor = Preprocess("/scratch/network/alexeys/bills/lexs/text_50states_part2_v2/*/*/catalog_*","/scratch/network/alexeys/bills/lexs/bills_combined_wu_50_p2_fed.json",True,False)
-    #preprocessor.fillStructures()
-    #preprocessor.saveStructures()
+    for state in ['CO','IL','NJ']:
+        preprocessor = Preprocess("/scratch/network/maryak","/scratch/network/alexeys/bills/lexs/","test"+state+".json",True,True,True)
+        preprocessor.fillStructures(state)
+        preprocessor.saveStructures()
