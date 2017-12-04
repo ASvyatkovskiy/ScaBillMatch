@@ -275,3 +275,33 @@ To launch a job:
 ```bash
 spark-submit --class org.princeton.billmatch.LDAAnalyzer --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar
 ```
+
+# Producing Metadata
+
+## For federal
+
+The data format is different between the federal and state bills. For federal house one can do:
+
+```scala
+//To produce Federal metadata for House bills only
+scala> import java.io._
+
+scala> val data = sc.wholeTextFiles("file:///scratch/network/alexeys/bills/lexs/federal/*/bills/h*/*/text-versions/ih*/data.json")
+data: org.apache.spark.rdd.RDD[(String, String)] = file:///scratch/network/alexeys/bills/lexs/federal/*/bills/h*/*/text-versions/ih*/data.json MapPartitionsRDD[12] at wholeTextFiles at <console>:27
+
+scala> val d = data.map(x=>x._2).map(x => x.replace("\n", "")).map(x => x.trim().replaceAll(" +", " "))
+d: org.apache.spark.rdd.RDD[String] = MapPartitionsRDD[15] at map at <console>:29
+
+//this makes a strign delimeted by end of line characters
+scala> val ddd = d.collect().mkString("\n")
+
+scala> val pw = new PrintWriter(new File("FD_house.json" ))
+
+scala> pw.write(ddd)
+scala> pw.close()
+```
+
+For federal senate bills, the abse path would be:
+```bash
+file:///scratch/network/alexeys/bills/lexs/federal/*/bills/s*/*/text-versions/is*/data.json
+```
