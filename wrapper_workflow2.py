@@ -16,3 +16,6 @@ for line in config:
 
 Popen("hdfs dfs -rmr "+outputFileBase+"*_*",shell=True).wait()
 print("The workflow2 results are in folder {}".format(outputFileBase))
+
+#do postprocessing
+Popen("spark-submit --class org.princeton.billmatch.utils.Postprocessor --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g {}".format(jar_path),shell=True).wait()
