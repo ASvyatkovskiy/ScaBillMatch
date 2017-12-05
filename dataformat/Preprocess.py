@@ -302,6 +302,6 @@ class Preprocess(object):
 if __name__=='__main__':
 
     for state in ['CO','IL','NJ']:
-        preprocessor = Preprocess("/scratch/network/maryak","/scratch/network/alexeys/bills/lexs/","test"+state+".json",True,True,True)
+        preprocessor = Preprocess("/scratch/network/maryak","/scratch/network/alexeys/bills/lexs/","test_COILNJ.json",True,True,True)
         preprocessor.fillStructures(state)
         preprocessor.saveStructures()
