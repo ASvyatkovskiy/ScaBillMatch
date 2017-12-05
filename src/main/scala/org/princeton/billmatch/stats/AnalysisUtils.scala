@@ -47,9 +47,9 @@ object AnalysisUtils {
     val processed_data = spark.read.parquet(processed_input_filename)
     val sorted = isAscending match {
         case true if numRows >= 0 => {processed_data.sort(asc("similarity")).limit(numRows)}
-        case true if numRows < 0 => {processed_data.sort(asc("similarity"))}
+        case true if numRows < 0 => {processed_data}
         case false if numRows >= 0 => {processed_data.sort(desc("similarity")).limit(numRows)}
-        case false if numRows < 0 => {processed_data.sort(desc("similarity"))}
+        case false if numRows < 0 => {processed_data}
         case other: Any =>
           throw new IllegalArgumentException(
             s"Only hamming, cosine, euclidean, manhattan, and jaccard similarities are supported but got $other."
@@ -60,11 +60,13 @@ object AnalysisUtils {
     val j1 = if (makeLight) sorted_dataset.join(raw_bills,$"pk1" === $"primary_key").select("pk1","pk2","similarity") else sorted_dataset.join(raw_bills.withColumnRenamed("content","content1"),$"pk1" === $"primary_key").select("pk1","pk2","content1","similarity")
     val j2 = if (makeLight) j1.join(raw_bills,$"pk2" === $"primary_key").select("pk1","pk2","similarity") else j1.join(raw_bills.withColumnRenamed("content","content2"),$"pk2" === $"primary_key").select("pk1","pk2","content1","content2","similarity") //.write.parquet("/user/path/to/output")
     //to sort by similarity do
-    if (isAscending) {
+    if (isAscending && numRows >= 0) {
       j2.sort(asc("similarity"))
-    } else {
+    } else if (!isAscending && numRows >= 0) {
       j2.sort(desc("similarity"))
-    }
+    } else {
+      j2
+    } 
   } 
 
   def sampleNRandom(spark: SparkSession, raw_input_filename: String, processed_input_filename: String, numRows: Int, isAscending: Boolean, threshold: Double) : DataFrame = {
