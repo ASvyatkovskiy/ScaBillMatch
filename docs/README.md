@@ -309,7 +309,7 @@ file:///scratch/network/alexeys/bills/lexs/federal/*/bills/s*/*/text-versions/is
 Alternatively, one can use the MetadataConverter class:
 https://github.com/ASvyatkovskiy/ScaBillMatch/blob/master/src/main/scala/org/princeton/billmatch/utils/MetadataConverter.scala
 
-and configure it via:https://github.com/ASvyatkovskiy/ScaBillMatch/blob/master/src/main/resources/metadata.conf
+and configure it via: https://github.com/ASvyatkovskiy/ScaBillMatch/blob/master/src/main/resources/metadata.conf
 
 ```
 metadata {
@@ -319,7 +319,7 @@ metadata {
 }
 ```
 
-And run on the cluster (not the yarn client deplot mode):
+And run on the cluster (only yarn client deploy mode or local master will work!):
 ```bash
 spark-submit --class org.princeton.billmatch.utils.MetadataConverter --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar
 ```
