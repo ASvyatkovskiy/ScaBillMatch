@@ -28,7 +28,7 @@ object MetadataConverter {
     val outputJsonBasePath = params.getString("metadata.outputJsonBasePath")
     val isFederal = params.getBoolean("metadata.isFederal")
 
-    var states = List("WA", "WI", "WV", "FL", "WY", "NH", "NJ", "NM", "NC", "ND", "NE", "NY", "RI", "NV", "CO", "CA", "GA", "CT", "OK", "OH", "KS", "SC", "KY", "OR", "SD", "DE", "HI", "TX", "LA", "TN", "PA", "VA", "AK", "AL", "AR", "VT", "IL", "IN", "IA", "AZ", "ID", "ME", "MD", "MA", "UT", "MO", "MN", "MI", "MT", "MS").par
+    var states = List("WI","WA", "WV", "FL", "WY", "NH", "NJ", "NM", "NC", "ND", "NE", "NY", "RI", "NV", "CO", "CA", "GA", "CT", "OK", "OH", "KS", "SC", "KY", "OR", "SD", "DE", "HI", "TX", "LA", "TN", "PA", "VA", "AK", "AL", "AR", "VT", "IL", "IN", "IA", "AZ", "ID", "ME", "MD", "MA", "UT", "MO", "MN", "MI", "MT", "MS").par
 
     if (isFederal) states = List("h","s").par
 
@@ -40,6 +40,7 @@ object MetadataConverter {
        val pw = new PrintWriter(new File(outputJsonBasePath+"/met_"+ss+".json" ))
        pw.write(ddd)
        pw.close()
+       println("Finished processing state "+ss)
     }
     spark.stop()
 
