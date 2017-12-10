@@ -25,13 +25,13 @@ object Postprocessor {
   val outputLightFile = params.getString("postprocessor.outputLightFile") 
 
   //takes the output of the steps2 of the bill analysis
-  //val skimmed_data = AnalysisUtils.sampleNOrdered(spark,inputJsonPath,inputResultParquet,getNBest,isAscending,true)
+  val skimmed_data = AnalysisUtils.sampleNOrdered(spark,inputJsonPath,inputResultParquet,getNBest,isAscending,true)
 
   //imposes temporal order among key columns
-  //val ordered_skim_data = AnalysisUtils.imposeTemporalOrder(skimmed_data)
+  val ordered_skim_data = AnalysisUtils.imposeTemporalOrder(skimmed_data)
 
   //saves to the skimmed
-  //ordered_skim_data.repartition(1).write.json(outputSkimFile)
+  ordered_skim_data.repartition(1).write.json(outputSkimFile)
 
   //to get light specify
   val raw = spark.read.parquet(inputResultParquet) 
