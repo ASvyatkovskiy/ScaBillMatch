@@ -203,40 +203,38 @@ root
 ```
 
 
-## Produce skim
+## Produce all postprocessed files in one submission
 
-Launch the spark-shell like:
 ```bash
-spark-shell --master yarn --queue production --num-executors 40 --executor-cores 3 --executor-memory 15g --driver-memory 20g --conf "spark.shuffle.memoryFraction=0.7" --conf "spark.shuffle.service.enabled=true" --jars target/scala-2.11/BillAnalysis-assembly-2.0.jar --packages "org.diana-hep:histogrammar-bokeh_2.11:1.0.4" --conf "spark.driver.maxResultSize=20g"
+spark-submit --class org.princeton.billmatch.utils.Postprocessor --master yarn --deploy-mode client --queue production --num-executors 40 --executor-cores 3 --executor-memory 16g --driver-memory 20g target/scala-2.11/BillAnalysis-assembly-2.0.jar
 ```
 
-Then type:
+This is configured in one conf file `src/main/resources/postprocessor.conf`:
+```
+postprocessor {
+  inputJsonPath = "file:////scratch/network/alexeys/bills/lexs/bills_combined_3_COILNJ_new.json",
+  inputResultParquet = "/user/alexeys/workflow2/raw/51/output_5gram_minhash_d0.99_buckets100_1048576_max_withcompacts",
+  getNBest = 50000,
+  isAscending = false,
+  outputSkimFile = "/user/alexeys/output_skimmed",
+  outputLightFile = "/user/alexeys/output_light"
+}
+```
+
+Which takes the initial JSOn files and the output of the Workflow1 or Workflow2 in parquet format. This will produce both skim and light formats.
+
+## If you only need light
+
+If you only need light, you might be better off just doing it in spark-shell:
 ```scala
 import org.princeton.billmatch.stats._
 
-//takes the initial data in JSON format and the output of the steps2 of the bill analysis (can either be workflow2 or workflow1)
-val skimmed_data = AnalysisUtils.sampleNOrdered(spark,"file:///...json","/user/alexeys/.../parquet",50000,false,false)
+//to get light specify
+val raw = spark.read.parquet(<path to output file of workflow1 or workflow2>) 
+val ordered_light_data = AnalysisUtils.makeLight(raw)
 
-//imposes temporal order among key columns
-val ordered_data = AnalysisUtils.imposeTemporalOrder(skimmed_data)
-
-//saves to the skimmed
-ordered_data.repartition(10).write.json("/user/alexeys/...")
-```
-
-
-## Produce light
-```scala
-import org.princeton.billmatch.stats._
-
-//to get light specify:
-val skimmed_data = AnalysisUtils.sampleNOrdered(spark,"file:///...json","/user/alexeys/.../parquet",-1,false,true)
-
-//imposes temporal order among key columns
-val ordered_data = AnalysisUtils.imposeTemporalOrder(skimmed_data)
-
-//saves to the skimmed
-ordered_data.repartition(10).write.json("/user/alexeys/...")
+//saves to the light
+ordered_light_data.write.json(<name of the output file you give it>)
 ```
 
 
@@ -301,7 +299,7 @@ scala> pw.write(ddd)
 scala> pw.close()
 ```
 
-For federal senate bills, the abse path would be:
+For federal senate bills, the base path would be:
 ```bash
 file:///scratch/network/alexeys/bills/lexs/federal/*/bills/s*/*/text-versions/is*/data.json
 ```
