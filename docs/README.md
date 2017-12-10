@@ -221,7 +221,22 @@ postprocessor {
 }
 ```
 
-Which takes the initial JSOn files and the output of the Workflow1 or Workflow2 in parquet format
+Which takes the initial JSOn files and the output of the Workflow1 or Workflow2 in parquet format. This will produce both skim and light formats.
+
+## If you only need light
+
+If you only need light, you might be better off just doing it in spark-shell:
+```scala
+import org.princeton.billmatch.stats._
+
+//to get light specify
+val raw = spark.read.parquet(<path to output file of workflow1 or workflow2>) 
+val ordered_light_data = AnalysisUtils.makeLight(raw)
+
+//saves to the light
+ordered_light_data.write.json(<name of the output file you give it>)
+```
+
 
 # LDA
 
