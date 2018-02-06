@@ -173,17 +173,29 @@ object Utils {
   }
 
   def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
+  def small_word_pattern = "\\b\\w{2}\\b".r
+  def smallWordRemover = udf((s: String) => small_word_pattern replaceAllIn(s, ""))
 
   def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int, useCountVectorizer: Boolean = false, vocabLimit: Int = 262144) : DataFrame = {
-    val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
+    var cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
+    cleaned_df = cleaned_df.withColumn("cleaned",smallWordRemover(col("cleaned")))
 
     //tokenizer = Tokenizer(inputCol="text", outputCol="words")
     var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
     val tokenized_df = tokenizer.transform(cleaned_df)
 
     //remove stopwords 
-    var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
+    //var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
+
+    val defaultStopWords = StopWordsRemover.loadDefaultStopWords("english")
+    val additionalStopWords = Array("texas", "whereas", "therefore")
+    var remover = new StopWordsRemover()
+      .setInputCol("words")
+      .setOutputCol("filtered")
+      .setStopWords(defaultStopWords++additionalStopWords)
     var prefeaturized_df = remover.transform(tokenized_df).drop("words")
+    prefeaturized_df.printSchema()
+    prefeaturized_df.show()
 
     if (addNGramFeatures) {
 
