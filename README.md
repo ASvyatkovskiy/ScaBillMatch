@@ -1,5 +1,7 @@
 # ScaBillMatch [![Build Status](https://travis-ci.org/ASvyatkovskiy/ScaBillMatch.svg?branch=master)](https://travis-ci.org/ASvyatkovskiy/ScaBillMatch.svg?branch=master)
 
+[![DOI](https://zenodo.org/badge/54519744.svg)](https://zenodo.org/badge/latestdoi/54519744)
+
 Policy diffusion occurs when government decisions in a given jurisdiction are systematically influenced by prior policy choices made in other jurisdictions [Gilardi]. While policy diffusion can manifest in a variety of forms, we focus on a
 type of policy diffusion that can be detected by examining similarity of legislative bill texts. We aim to identify groups of legislative bills from different states falling into the same diffusion topic, to perform an all-pairs comparison between the bills within each topic, and to identify paths connecting specific legislative proposals on a graph.
 
