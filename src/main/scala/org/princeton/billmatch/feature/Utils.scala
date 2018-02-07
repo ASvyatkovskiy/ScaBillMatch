@@ -33,6 +33,7 @@ import org.apache.spark.ml.linalg.{
    DenseVector => NewDenseVector,
    SparseVector => NewSparseVector
 }
+import org.apache.spark.mllib.feature.Stemmer
 
 import org.princeton.billmatch.linalg._
 
@@ -176,7 +177,7 @@ object Utils {
   def small_word_pattern = "\\b\\w{2}\\b".r
   def smallWordRemover = udf((s: String) => small_word_pattern replaceAllIn(s, ""))
 
-  def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int, useCountVectorizer: Boolean = false, vocabLimit: Int = 262144) : DataFrame = {
+  def extractFeatures(bills: DataFrame, numTextFeatures: Int, addNGramFeatures: Boolean, nGramGranularity: Int, useCountVectorizer: Boolean = false, useStemming: Boolean = false, vocabLimit: Int = 262144) : DataFrame = {
     var cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content"))) //.drop("content")
     cleaned_df = cleaned_df.withColumn("cleaned",smallWordRemover(col("cleaned")))
 
@@ -194,8 +195,12 @@ object Utils {
       .setOutputCol("filtered")
       .setStopWords(defaultStopWords++additionalStopWords)
     var prefeaturized_df = remover.transform(tokenized_df).drop("words")
-    prefeaturized_df.printSchema()
-    prefeaturized_df.show()
+ 
+    if (useStemming) {
+        prefeaturized_df = new Stemmer().setInputCol("filtered").setOutputCol("stemmed")
+          .setLanguage("English").transform(prefeaturized_df)
+        prefeaturized_df = prefeaturized_df.select(col("primary_key"),col("content"),col("docversion"),col("docid"),col("state"),col("year"),col("length"),col("stemmed").alias("filtered"))
+    }
 
     if (addNGramFeatures) {
 
