@@ -62,6 +62,7 @@ object LDAAnalyzer {
     val nGramGranularity = params.getInt("ldaAnalyzer.nGramGranularity")
     val numTextFeatures = params.getInt("ldaAnalyzer.numTextFeatures")
     val addNGramFeatures = params.getBoolean("ldaAnalyzer.addNGramFeatures")
+    val useStemming = params.getBoolean("ldaAnalyzer.useStemming")
     val kval = params.getInt("ldaAnalyzer.kval")
     val verbose = params.getBoolean("ldaAnalyzer.verbose")
 
@@ -70,7 +71,7 @@ object LDAAnalyzer {
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
 
     val vocabLimit = params.getInt("ldaAnalyzer.vocabSizeLimit")
-    var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity,true,vocabLimit).cache()
+    var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity,true,useStemming,vocabLimit).cache()
     if (verbose) features_df.show
 
     // Trains LDA model
