@@ -185,15 +185,16 @@ object Utils {
     var tokenizer = new RegexTokenizer().setInputCol("cleaned").setOutputCol("words").setPattern("\\W")
     val tokenized_df = tokenizer.transform(cleaned_df)
 
-    //remove stopwords 
+    //remove stopwords
     //var remover = new StopWordsRemover().setInputCol("words").setOutputCol("filtered")
-
+    // modified to customize the removal of stopwords
     val defaultStopWords = StopWordsRemover.loadDefaultStopWords("english")
-    val additionalStopWords = Array("texas", "whereas", "therefore")
+    val additionalStopWords = Array("alaska", "alabama", "arizona", "california", "colorado", "connecticut", "columbia", "delaware", "florida", "georgia", "guam", "hawaii", "iowa", "idaho", "illinois", "indiana", "kansas", "kentucky", "louisiana", "massachusetts", "maryland", "maine", "michigan", "minnesota", "missouri", "mariana", "island", "mississippi", "montana", "national", "carolina", "dakota", "nebraska", "new", "hampshire", "jersey", "mexico", "nevada", "york", "ohio", "oklahoma", "ohio", "oregon", "pennsylvania", "puerto", "rico", "rhode", "tennessee", "texas", "utah", "virginia", "virgin", "vermont", "washington", "wisconsin", "wyoming", "north", "south", "east", "west", "thence", "ic", "whereas", "member", "district", "mr", "along", "united", "states", "ors", "rcw", "vtd", "rsa", "said", "high", "low", "members", "order", "shall", "isomers", "ors", "line", "sec", "therefore", "year", "l")
     var remover = new StopWordsRemover()
       .setInputCol("words")
       .setOutputCol("filtered")
       .setStopWords(defaultStopWords++additionalStopWords)
+
     var prefeaturized_df = remover.transform(tokenized_df).drop("words")
  
     if (useStemming) {
