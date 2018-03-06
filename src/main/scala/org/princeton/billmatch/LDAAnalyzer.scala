@@ -64,6 +64,7 @@ object LDAAnalyzer {
     val addNGramFeatures = params.getBoolean("ldaAnalyzer.addNGramFeatures")
     val useStemming = params.getBoolean("ldaAnalyzer.useStemming")
     val kval = params.getInt("ldaAnalyzer.kval")
+    val nmaxiter = params.getInt("ldaAnalyzer.nmaxiter")
     val verbose = params.getBoolean("ldaAnalyzer.verbose")
 
     val input = spark.read.json(params.getString("ldaAnalyzer.inputFile")).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content")))
@@ -75,7 +76,7 @@ object LDAAnalyzer {
     if (verbose) features_df.show
 
     // Trains LDA model
-    val lda = new LDA().setK(kval).setMaxIter(10)
+    val lda = new LDA().setK(kval).setMaxIter(nmaxiter)
 
     val model = lda.fit(features_df)
   
