@@ -65,7 +65,7 @@ object LDAAnalyzer {
     val useStemming = params.getBoolean("ldaAnalyzer.useStemming")
     val kval = params.getInt("ldaAnalyzer.kval")
     val nmaxiter = params.getInt("ldaAnalyzer.nmaxiter")
-    val nOutTerms = params.getInt("nOutTerms")
+    val nOutTerms = params.getInt("ldaAnalyzer.nOutTerms")
     val verbose = params.getBoolean("ldaAnalyzer.verbose")
 
     val input = spark.read.json(params.getString("ldaAnalyzer.inputFile")).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content")))
