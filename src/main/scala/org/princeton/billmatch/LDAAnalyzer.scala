@@ -58,21 +58,21 @@ object LDAAnalyzer {
 
     import spark.implicits._
 
-    val vv: String = params.getString("ldaAnalyzer.docVersion") //like "Enacted"
-    val nGramGranularity = params.getInt("ldaAnalyzer.nGramGranularity")
-    val numTextFeatures = params.getInt("ldaAnalyzer.numTextFeatures")
-    val addNGramFeatures = params.getBoolean("ldaAnalyzer.addNGramFeatures")
-    val useStemming = params.getBoolean("ldaAnalyzer.useStemming")
-    val kval = params.getInt("ldaAnalyzer.kval")
-    val nmaxiter = params.getInt("ldaAnalyzer.nmaxiter")
-    val nOutTerms = params.getInt("ldaAnalyzer.nOutTerms")
-    val verbose = params.getBoolean("ldaAnalyzer.verbose")
+    lazy val vv: String = params.getString("ldaAnalyzer.docVersion") //like "Enacted"
+    lazy val nGramGranularity = params.getInt("ldaAnalyzer.nGramGranularity")
+    lazy val numTextFeatures = params.getInt("ldaAnalyzer.numTextFeatures")
+    lazy val addNGramFeatures = params.getBoolean("ldaAnalyzer.addNGramFeatures")
+    lazy val useStemming = params.getBoolean("ldaAnalyzer.useStemming")
+    lazy val kval = params.getInt("ldaAnalyzer.kval")
+    lazy val nmaxiter = params.getInt("ldaAnalyzer.nmaxiter")
+    lazy val nOutTerms = params.getInt("ldaAnalyzer.nOutTerms")
+    lazy val verbose = params.getBoolean("ldaAnalyzer.verbose")
 
     val input = spark.read.json(params.getString("ldaAnalyzer.inputFile")).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content")))
     val npartitions = (4*input.count()/1000).toInt
     val bills = input.repartition(Math.max(npartitions,200),col("primary_key"),col("content"))
 
-    val vocabLimit = params.getInt("ldaAnalyzer.vocabSizeLimit")
+    lazy val vocabLimit = params.getInt("ldaAnalyzer.vocabSizeLimit")
     var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity,true,useStemming,vocabLimit).cache()
     if (verbose) features_df.show
 

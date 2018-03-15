@@ -74,17 +74,17 @@ object ExtractMinHashLSH {
 
     val params = ConfigFactory.load("workflow2")
 
-    val vv: String = params.getString("workflow2.docVersion")
-    val inputFile: String = params.getString("workflow2.inputFile")
+    lazy val vv: String = params.getString("workflow2.docVersion")
+    lazy val inputFile: String = params.getString("workflow2.inputFile")
     val input = spark.read.json(inputFile).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
 
     ///val npartitions = (4*input.count()/1000).toInt
     val bills = input.repartition(400,col("primary_key")).cache()
     bills.explain
 
-    val nGramGranularity = params.getInt("workflow2.nGramGranularity")
-    val numTextFeatures = params.getInt("workflow2.numTextFeatures")
-    val outfile = params.getString("workflow2.outputFileBase")
+    lazy val nGramGranularity = params.getInt("workflow2.nGramGranularity")
+    lazy val numTextFeatures = params.getInt("workflow2.numTextFeatures")
+    lazy val outfile = params.getString("workflow2.outputFileBase")
 
     def cleaner_udf = udf((s: String) => s.replaceAll("(\\d|,|:|;|\\?|!)", ""))
     val cleaned_df = bills.withColumn("cleaned",cleaner_udf(col("content")))

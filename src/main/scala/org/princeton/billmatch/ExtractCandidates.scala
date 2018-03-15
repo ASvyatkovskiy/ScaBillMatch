@@ -86,12 +86,12 @@ object ExtractCandidates {
 
     import spark.implicits._
 
-    val vv: String = params.getString("workflow1_makeCartesian.docVersion") //like "Enacted"
-    val nGramGranularity = params.getInt("workflow1_makeCartesian.nGramGranularity")
-    val addNGramFeatures = params.getBoolean("workflow1_makeCartesian.addNGramFeatures")
-    val numTextFeatures = params.getInt("workflow1_makeCartesian.numTextFeatures")
-    val useLSA = params.getBoolean("workflow1_makeCartesian.useLSA")
-    val kval = params.getInt("workflow1_makeCartesian.kval")
+    lazy val vv: String = params.getString("workflow1_makeCartesian.docVersion") //like "Enacted"
+    lazy val nGramGranularity = params.getInt("workflow1_makeCartesian.nGramGranularity")
+    lazy val addNGramFeatures = params.getBoolean("workflow1_makeCartesian.addNGramFeatures")
+    lazy val numTextFeatures = params.getInt("workflow1_makeCartesian.numTextFeatures")
+    lazy val useLSA = params.getBoolean("workflow1_makeCartesian.useLSA")
+    lazy val kval = params.getInt("workflow1_makeCartesian.kval")
 
     val input = spark.read.json(params.getString("workflow1_makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
     input.printSchema()
