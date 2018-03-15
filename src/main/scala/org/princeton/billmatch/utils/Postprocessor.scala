@@ -16,7 +16,7 @@ object Postprocessor {
 
   import spark.implicits._
 
-  private val params = ConfigFactory.load("postprocessor")
+  val params = ConfigFactory.load("postprocessor")
   lazy val inputJsonPath = params.getString("postprocessor.inputJsonPath")
   lazy val inputResultParquet = params.getString("postprocessor.inputResultParquet")
   lazy val getNBest = params.getInt("postprocessor.getNBest") 
