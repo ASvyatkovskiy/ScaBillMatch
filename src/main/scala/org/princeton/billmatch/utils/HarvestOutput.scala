@@ -26,7 +26,7 @@ object HarvestOutput {
      input.write.parquet(path) 
   } else {
     val specific_params = ConfigFactory.load(specific_class+"_billAnalyzer")
-    lazy var path = specific_params.getString(specific_class+"_billAnalyzer.outputMainFile")
+    var path = specific_params.getString(specific_class+"_billAnalyzer.outputMainFile")
     val p = path.split("_").dropRight(1)
     path = p.mkString("_")
 
