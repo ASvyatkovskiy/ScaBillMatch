@@ -23,10 +23,10 @@ object MetadataConverter {
 
     import spark.implicits._
 
-    val params = ConfigFactory.load("metadata")
-    val inputJsonBasePath = params.getString("metadata.inputJsonBasePath")
-    val outputJsonBasePath = params.getString("metadata.outputJsonBasePath")
-    val isFederal = params.getBoolean("metadata.isFederal")
+    private val params = ConfigFactory.load("metadata")
+    lazy val inputJsonBasePath = params.getString("metadata.inputJsonBasePath")
+    lazy val outputJsonBasePath = params.getString("metadata.outputJsonBasePath")
+    lazy val isFederal = params.getBoolean("metadata.isFederal")
 
     var states = List("WI","WA", "WV", "FL", "WY", "NH", "NJ", "NM", "NC", "ND", "NE", "NY", "RI", "NV", "CO", "CA", "GA", "CT", "OK", "OH", "KS", "SC", "KY", "OR", "SD", "DE", "HI", "TX", "LA", "TN", "PA", "VA", "AK", "AL", "AR", "VT", "IL", "IN", "IA", "AZ", "ID", "ME", "MD", "MA", "UT", "MO", "MN", "MI", "MT", "MS").par
 

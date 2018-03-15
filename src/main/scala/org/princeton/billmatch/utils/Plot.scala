@@ -25,8 +25,8 @@ object Plot {
 
     import spark.implicits._
      
-    val rawInput = params.getString("plotting.rawInput")
-    val outputJson = params.getString("plotting.outputJson")
+    lazy val rawInput = params.getString("plotting.rawInput")
+    lazy val outputJson = params.getString("plotting.outputJson")
     val input = spark.read.parquet(rawInput)
     input.histogrammar(Bin(10, 0, 100, $"similarity")).toJsonFile(outputJson)
     spark.stop()

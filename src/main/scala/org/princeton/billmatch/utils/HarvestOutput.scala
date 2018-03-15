@@ -16,17 +16,17 @@ object HarvestOutput {
   import spark.implicits._
 
   val params = ConfigFactory.load("harvester")
-  val specific_class = params.getString("harvester.app")
+  lazy val specific_class = params.getString("harvester.app")
   if (specific_class == "workflow2") {
      val specific_params = ConfigFactory.load(specific_class)
-     val path = specific_params.getString(specific_class+".outputFileBase")
+     lazy val path = specific_params.getString(specific_class+".outputFileBase")
 
      // Loads data.
      val input = spark.read.parquet(path+"*_*")
      input.write.parquet(path) 
   } else {
     val specific_params = ConfigFactory.load(specific_class+"_billAnalyzer")
-    var path = specific_params.getString(specific_class+"_billAnalyzer.outputMainFile")
+    lazy var path = specific_params.getString(specific_class+"_billAnalyzer.outputMainFile")
     val p = path.split("_").dropRight(1)
     path = p.mkString("_")
 
