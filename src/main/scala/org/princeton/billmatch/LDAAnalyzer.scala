@@ -65,6 +65,7 @@ object LDAAnalyzer {
     val useStemming = params.getBoolean("ldaAnalyzer.useStemming")
     val kval = params.getInt("ldaAnalyzer.kval")
     val nmaxiter = params.getInt("ldaAnalyzer.nmaxiter")
+    val nOutTerms = params.getInt("ldaAnalyzer.nOutTerms")
     val verbose = params.getBoolean("ldaAnalyzer.verbose")
 
     val input = spark.read.json(params.getString("ldaAnalyzer.inputFile")).filter($"docversion" === vv).filter(Utils.lengthSelector_udf(col("content")))
@@ -88,7 +89,7 @@ object LDAAnalyzer {
     }
 
     // Describe topics.
-    val topics = model.describeTopics(10)
+    val topics = model.describeTopics(nOutTerms)
     if (verbose) {
       println("The topics described by their top-weighted terms:")
       topics.show(false)
