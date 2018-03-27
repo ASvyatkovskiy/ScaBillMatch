@@ -92,6 +92,8 @@ object ExtractCandidates {
     lazy val numTextFeatures = params.getInt("workflow1_makeCartesian.numTextFeatures")
     lazy val useLSA = params.getBoolean("workflow1_makeCartesian.useLSA")
     lazy val kval = params.getInt("workflow1_makeCartesian.kval")
+    lazy val optimizationLevel = params.getInt("workflow1_makeCartesian.optimizationLevel")
+    lazy val predicate_path = params.getString("workflow1_makeCartesian.cat")
 
     val input = spark.read.json(params.getString("workflow1_makeCartesian.inputFile")).filter($"docversion" === vv).filter(Utils.compactSelector_udf(col("content"))).filter(Utils.lengthSelector_udf(col("content")))
     input.printSchema()
@@ -134,22 +136,35 @@ object ExtractCandidates {
         clusters_df.show()
         dataPart1.unpersist()
         dataPart2.unpersist()
-    } else {
+    } else if (optimizationLevel > 0) {
         clusters_df = Utils.KMeansSuite(features_df,kval)
+    } else {
+        clusters_df = features_df.withColumn("prediction",lit(-1))
     }
  
     clusters_df.select("primary_key","docversion","docid","state","year","prediction","length","features").write.parquet(params.getString("workflow1_makeCartesian.outputParquetFile"))
 
+    //this does not get filtered
     var bills_meta = clusters_df.select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].cache()
-    var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta.collect())
+
+    var bills_meta_for_bcast = Array[MetaLabeledDocument]()
+
+    if (predicate_path.length() > 0) { 
+      val custom_predicate : String = Utils.makeCustomPredicate(predicate_path)        
+      bills_meta_for_bcast = clusters_df.filter(custom_predicate).select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].collect()
+     } else {
+      bills_meta_for_bcast = clusters_df.select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].collect()
+    }
+
+    var bills_meta_bcast = spark.sparkContext.broadcast(bills_meta_for_bcast)
 
     var cartesian_pairs = bills_meta.rdd.coalesce(params.getInt("workflow1_makeCartesian.nPartitions"))
-                          .map(x => Utils.pairup(x,bills_meta_bcast, params.getBoolean("workflow1_makeCartesian.onlyInOut"),params.getInt("workflow1_makeCartesian.optimizationLevel"))).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
+                          .map(x => Utils.pairup(x,bills_meta_bcast, params.getBoolean("workflow1_makeCartesian.onlyInOut"),optimizationLevel)).filter({case (dd,ll) => (ll.length > 0)}).map({case(k,v) => v}).flatMap(x => x) //.groupByKey()    
 
     cartesian_pairs.saveAsObjectFile(params.getString("workflow1_makeCartesian.outputFile"))
     spark.stop()
    }
 }
 
-case class MetaLabeledDocument(primary_key: String, prediction: Long, state: Long, docid: String, docversion: String, year: Long, length: Long)
+case class MetaLabeledDocument(primary_key: String, prediction: Option[Long], state: Long, docid: String, docversion: String, year: Long, length: Long)
 case class CartesianPair(pk1: String, pk2: String)
