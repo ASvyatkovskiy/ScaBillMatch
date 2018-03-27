@@ -276,7 +276,7 @@ object Utils {
     })
 
 
-  def makeCustomPredicate6(path: String) : String = {  
+  def makeCustomPredicate(path: String) : String = {  
       val inputs = Source.fromFile(path).getLines.toArray
       var result = "primary_key == "
       for (input <- inputs.dropRight(1)) {
