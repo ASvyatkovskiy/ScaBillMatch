@@ -78,7 +78,7 @@ outputFileBase   = "/user/alexeys/wf2_similarity_join"
 ```
 when it is finished. The proceed to "Postprocessing" section.
 
-# Workflow1 [more difficult]
+# Workflow1 [more convoluted]
 
 Proceeds in 2 steps
 
@@ -101,7 +101,8 @@ workflow1_makeCartesian {
   nPartitions  = 40,
   numTextFeatures = 1048576,
   kval = 400,
-  numConcepts = 100
+  numConcepts = 100,
+  cat = ""
 }
 ```
 
@@ -170,6 +171,47 @@ Note, that the steps are the same for Workflow1 and baseline. Only one needs to 
 optimizationLevel=0,
 ```
 for baseline.
+
+## Baseline for a given diffusion topic
+
+Sometime, we want calculate a similarity between all possible bill pairs where at least one bill belongs to a certain diffusion category determined by the researcher.
+
+To accomplish that, one can prepare a plain text file with the list of bill identifier in the format: two letter state, 4 digits year, bill identifier, bill version, one value per line. For instance:
+
+```
+AK_2005_SB200_Introduced
+GA_2005_SB396_Introduced
+...
+```
+Note, that this is the data format for bills used throughout all the classes in this software tool.
+
+Next, modify the configuration file`src/main/resources/workflow1_makeCartesian.conf` by adding a relative path to the plain text file containing the bill identifiers (parameter `cat`):
+```bash
+workflow1_makeCartesian {
+  optimizationLevel = 1,
+  docVersion   = "Introduced",
+  useLSA       = false,
+  onlyInOut    = true,
+  nGramGranularity = 5,
+  addNGramFeatures = true,
+  inputFile    = "file:///scratch/network/alexeys/bills/lexs/bills_combined_50_p*.json",
+  outputFile   = "/user/alexeys/valid_pairs_50",
+  outputParquetFile = "/user/alexeys/bills_combined_50",
+  nPartitions  = 40,
+  numTextFeatures = 1048576,
+  kval = 400,
+  numConcepts = 100,
+  cat = "data/standYourgroundBills.txt"
+}
+```
+
+What will happen is, a string with a predicate condition will be created and a filter will be applied before broadcasting the dataset during all pairs simialrity calculation. As a result, only bill pairs having at least one bill from that list will make it to the results.
+
+Note: if you point to a non-existent file the job will terminate with a `FileNotFoundException`.
+
+Note: the default value of the `cat` parameter is an empty string, it should be kept that way if your intension is to include all the bills in the dataset pointed to by `inputFile` string in the calculation.
+
+Restriction: for now, `client` YARN deploy mode only. TODO: support cluster deploy mode too should be simple
 
 # Postprocessing
 
