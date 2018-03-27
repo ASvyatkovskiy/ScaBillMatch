@@ -211,6 +211,8 @@ Note: if you point to a non-existent file the job will terminate with a `FileNot
 
 Note: the default value of the `cat` parameter is an empty string, it should be kept that way if your intension is to include all the bills in the dataset pointed to by `inputFile` string in the calculation.
 
+Restriction: for now, `client` YARN deploy mode only. TODO: support cluster deploy mode too should be simple
+
 # Postprocessing
 
 We use 3 different formats for analysis:
