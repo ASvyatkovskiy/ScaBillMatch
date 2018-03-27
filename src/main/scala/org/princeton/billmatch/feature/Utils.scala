@@ -274,4 +274,15 @@ object Utils {
 
        isLongEnough
     })
+
+
+  def makeCustomPredicate(path: String) : String = {  
+      val inputs = Source.fromFile(path).getLines.toArray
+      var result = "primary_key == "
+      for (input <- inputs) {
+        val a = Array(input,"OR","primary_key ==")
+        result += a.mkString(" ")
+      }  
+      result
+  }  
 }
