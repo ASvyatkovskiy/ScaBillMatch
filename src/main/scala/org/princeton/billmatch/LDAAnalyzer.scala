@@ -81,12 +81,14 @@ object LDAAnalyzer {
 
     val model = lda.fit(features_df)
   
-    if (verbose) {
-      val ll = model.logLikelihood(features_df)
-      val lp = model.logPerplexity(features_df)
-      println(s"The lower bound on the log likelihood of the entire corpus: $ll")
-      println(s"The upper bound bound on perplexity: $lp")
-    }
+    // if (verbose) {
+    val ll = model.logLikelihood(features_df)
+    ll.write.json(params.getString("ldaAnalyzer.outFile")+"_logLikelihood")
+    val lp = model.logPerplexity(features_df)
+    lp.write.json(params.getString("ldaAnalyzer.outFile")+"_logPerplexity")
+    // println(s"The lower bound on the log likelihood of the entire corpus: $ll")
+    // println(s"The upper bound bound on perplexity: $lp")
+    // }
 
     // Describe topics.
     val topics = model.describeTopics(nOutTerms)
