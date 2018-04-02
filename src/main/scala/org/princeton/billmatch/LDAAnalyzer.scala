@@ -30,6 +30,10 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 
 import org.princeton.billmatch.feature._
 
+import java.io._
+import scala.io.Source
+import java.io.FileWriter
+
 object LDAAnalyzer {
 
   def main(args: Array[String]) {
@@ -83,9 +87,11 @@ object LDAAnalyzer {
   
     // if (verbose) {
     val ll = model.logLikelihood(features_df)
-    ll.write.json(params.getString("ldaAnalyzer.outFile")+"_logLikelihood")
     val lp = model.logPerplexity(features_df)
-    lp.write.json(params.getString("ldaAnalyzer.outFile")+"_logPerplexity")
+    val fw: FileWriter = new FileWriter(params.getString("ldaAnalyzer.outputFile")+"_goodfit.dat")
+    fw.write(s"$ll"+"\n")
+    fw.write(s"$lp"+"\n")
+    fw.close()
     // println(s"The lower bound on the log likelihood of the entire corpus: $ll")
     // println(s"The upper bound bound on perplexity: $lp")
     // }

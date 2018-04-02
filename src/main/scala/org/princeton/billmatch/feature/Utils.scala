@@ -220,7 +220,7 @@ object Utils {
         prefeaturized_df = TFmodel.transform(prefeaturized_df).drop("combined")
         val vocab = TFmodel.vocabulary
 
-        val fw: FileWriter = new FileWriter(params.getString("ldaAnalyzer.outputFile")+".dat")
+        val fw: FileWriter = new FileWriter("vocab.dat")
         for (str <- vocab) {
           fw.write(str + "\n")
         }
