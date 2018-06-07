@@ -68,7 +68,7 @@ object Utils {
        //simple condition
        if (onlyInOut) {
          optimize match {
-           case 0 if (pk1 < pk2 && istate != jstate) => {
+           case 0 if (pk1 != pk2 && istate != jstate) => { // duplicates in the "both in the pair" category, but include all the "exactly one in the pair" category
                var output: CartesianPair = CartesianPair(pk1,pk2)
                output_arr += output
            }
@@ -281,6 +281,18 @@ object Utils {
       var result = "primary_key == "
       for (input <- inputs.dropRight(1)) {
         val a = Array("'"+input+"'","OR","primary_key == ")
+        result += a.mkString(" ")
+      }  
+      result += "'"+inputs.last+"'"
+      result
+  }
+
+
+  def makeCustomPredicateExclude(path: String) : String = {  
+      val inputs = Source.fromFile(path).getLines.toArray
+      var result = "primary_key != "
+      for (input <- inputs.dropRight(1)) {
+        val a = Array("'"+input+"'","AND","primary_key != ")
         result += a.mkString(" ")
       }  
       result += "'"+inputs.last+"'"
