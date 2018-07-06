@@ -153,13 +153,13 @@ object ExtractCandidates {
       val custom_predicate : String = Utils.makeCustomPredicate(predicate_path)        
       bills_meta_for_bcast = clusters_df.filter(custom_predicate).select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].collect()
 
-      if (params.getBoolean("bothIn")) {
-      	clusters_df = clusters_df.filter(custom_predicate)
+      if (params.getBoolean("workflow1_makeCartesian.bothIn")) {
+      	bills_meta = clusters_df.filter(custom_predicate).select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].cache()
       } else {
       	val custom_predicate_ex : String = Utils.makeCustomPredicateExclude(predicate_path)
-      	clusters_df = clusters_df.filter(custom_predicate_ex)
+      	bills_meta = clusters_df.filter(custom_predicate_ex).select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].cache()
       }
-     } else {
+    } else {
       bills_meta_for_bcast = clusters_df.select("primary_key","docversion","docid","state","year","prediction","length").as[MetaLabeledDocument].collect()
     }
 

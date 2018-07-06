@@ -68,7 +68,7 @@ object Utils {
        //simple condition
        if (onlyInOut) {
          optimize match {
-           case 0 if (pk1 != pk2 && istate != jstate) => { // duplicates in the "both in the pair" category, but include all the "exactly one in the pair" category
+           case 0 if (pk1 != pk2 && istate != jstate) => {
                var output: CartesianPair = CartesianPair(pk1,pk2)
                output_arr += output
            }
