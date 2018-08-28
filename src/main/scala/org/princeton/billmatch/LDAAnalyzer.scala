@@ -79,6 +79,7 @@ object LDAAnalyzer {
     lazy val vocabLimit = params.getInt("ldaAnalyzer.vocabSizeLimit")
     var features_df = Utils.extractFeatures(bills,numTextFeatures,addNGramFeatures,nGramGranularity,true,useStemming,vocabLimit).cache()
     if (verbose) features_df.show
+    // features_df.write.parquet(params.getString("ldaAnalyzer.outputFile")+"_features")    
 
     // Trains LDA model
     val lda = new LDA().setK(kval).setMaxIter(nmaxiter)

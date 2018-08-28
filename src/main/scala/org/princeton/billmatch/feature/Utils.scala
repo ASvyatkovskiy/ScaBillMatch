@@ -217,7 +217,7 @@ object Utils {
 
     if (useCountVectorizer) {
         var TFmodel = new CountVectorizer().setVocabSize(vocabLimit).setInputCol("combined").setOutputCol("rawFeatures").fit(prefeaturized_df)
-        prefeaturized_df = TFmodel.transform(prefeaturized_df).drop("combined")
+	prefeaturized_df = TFmodel.transform(prefeaturized_df).drop("combined")
         val vocab = TFmodel.vocabulary
 
         val fw: FileWriter = new FileWriter("vocab.dat")
@@ -225,15 +225,20 @@ object Utils {
           fw.write(str + "\n")
         }
         fw.close()
+
+        prefeaturized_df.select(col("primary_key"),col("rawFeatures").alias("features"))
+	
     } else {
         var hashingTF = new HashingTF().setInputCol("combined").setOutputCol("rawFeatures").setNumFeatures(numTextFeatures)
         prefeaturized_df = hashingTF.transform(prefeaturized_df).drop("combined")
+
+        var idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
+        //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
+        var idfModel = idf.fit(prefeaturized_df)
+	idfModel.transform(prefeaturized_df).drop("rawFeatures").drop("content")
+
     }
     
-    var idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
-    //val Array(train, cv) = featurized_df.randomSplit(Array(0.7, 0.3))
-    var idfModel = idf.fit(prefeaturized_df)
-    idfModel.transform(prefeaturized_df).drop("rawFeatures").drop("content")
   }
 
   def converter(row: scala.collection.Seq[Any]) : (Int,NewSparseVector) = {
