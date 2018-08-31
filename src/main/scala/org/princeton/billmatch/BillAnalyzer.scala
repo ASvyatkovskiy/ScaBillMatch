@@ -109,9 +109,9 @@ object BillAnalyzer {
     }
 
     val firstjoin = Utils.twoSidedJoin(cartesian_pairs,hashed_bills)
-    val matches = firstjoin.mapValues({case (v1,v2) => similarityMeasure.compute(v1,v2)}).filter({case (k,v) => (v > threshold)})
-    //matches.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").write.parquet(params.getString("workflow1_billAnalyzer.outputMainFile"))
-    matches.saveAsObjectFile(params.getString("workflow1_billAnalyzer.outputMainFile"))
+    val matches = firstjoin.mapValues({case (v1,v2) => similarityMeasure.compute(v1,v2)})//.filter({case (k,v) => (v > threshold)})
+    matches.map(x=>(x._1._1,x._1._2,x._2)).toDF("pk1","pk2","similarity").write.parquet(params.getString("workflow1_billAnalyzer.outputMainFile"))
+    //matches.saveAsObjectFile(params.getString("workflow1_billAnalyzer.outputMainFile"))
 
     spark.stop()
    }
