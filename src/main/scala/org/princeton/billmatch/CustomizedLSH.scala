@@ -48,11 +48,17 @@ private[ml] abstract class CustomizedLSHModel[T <: CustomizedLSHModel[T]]
   extends Model[T] with CustomizedLSHParams with MLWritable {
   self: T =>
 
+  /** @group setParam */
+  def setInputCol(value: String): this.type = set(inputCol, value)
+
+  /** @group setParam */
+  def setOutputCol(value: String): this.type = set(outputCol, value)
+
   /**
    * The hash function of LSH, mapping an input feature vector to multiple hash vectors.
    * @return The mapping of LSH function.
    */
-  protected[ml] val hashFunction: Vector => Array[Vector]
+  protected[ml] def hashFunction(elems: Vector): Array[Vector]
 
   /**
    * Calculate the distance between two different keys using the distance metric corresponding
@@ -74,7 +80,7 @@ private[ml] abstract class CustomizedLSHModel[T <: CustomizedLSHModel[T]]
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     transformSchema(dataset.schema, logging = true)
-    val transformUDF = udf(hashFunction, DataTypes.createArrayType(new VectorUDT))
+    val transformUDF = udf(hashFunction(_: Vector), DataTypes.createArrayType(new VectorUDT))
     dataset.withColumn($(outputCol), transformUDF(dataset($(inputCol))))
   }
 
@@ -268,7 +274,7 @@ private[ml] abstract class CustomizedLSHModel[T <: CustomizedLSHModel[T]]
  * hash column, approximate nearest neighbor search with a dataset and a key, and approximate
  * similarity join of two datasets.
  *
- * This CustomizedLSH class implements OR-amplification: more than 1 hash functions can be chosen, and each
+ * This LSH class implements OR-amplification: more than 1 hash functions can be chosen, and each
  * input vector are hashed by all hash functions. Two input vectors are defined to be in the same
  * bucket as long as ANY one of the hash value matches.
  *
@@ -292,11 +298,11 @@ private[ml] abstract class CustomizedLSH[T <: CustomizedLSHModel[T]]
   def setNumHashTables(value: Int): this.type = set(numHashTables, value)
 
   /**
-   * Validate and create a new instance of concrete CustomizedLSHModel. Because different CustomizedLSHModel may have
-   * different initial setting, developer needs to define how their CustomizedLSHModel is created instead of
+   * Validate and create a new instance of concrete LSHModel. Because different LSHModel may have
+   * different initial setting, developer needs to define how their LSHModel is created instead of
    * using reflection in this abstract class.
    * @param inputDim The dimension of the input dataset
-   * @return A new CustomizedLSHModel instance without any params
+   * @return A new LSHModel instance without any params
    */
   protected[this] def createRawCustomizedLSHModel(inputDim: Int): T
 
